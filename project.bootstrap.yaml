@@ -1,0 +1,131 @@
+version: 2
+project:
+  name: mailplus-intelligence
+  displayName: MailPlus Intelligence
+  description: Intelligence and automation workspace for MailPlus-related tooling.
+  visibility: private
+  owner: OMT-Global
+  defaultBranch: main
+repo:
+  class: library
+  managedPaths:
+    - project.bootstrap.yaml
+    - AGENTS.md
+    - CLAUDE.md
+    - CODEOWNERS
+    - .githooks/**
+    - .devcontainer/**
+    - .github/workflows/pr-fast-ci.yml
+    - .github/workflows/extended-validation.yml
+    - .github/workflows/claude.yml
+    - scripts/check-detect-secrets.sh
+    - scripts/ci/**
+    - scripts/codex-cloud/**
+    - scripts/claude-cloud/**
+    - scripts/claude/**
+    - docs/bootstrap/**
+  docs:
+    readme: true
+    contributing: false
+    security: false
+  templates:
+    pullRequest: standard
+    issueTemplates:
+      - bug
+      - feature
+  env:
+    exampleFile: false
+    strategy: optional
+  hooks:
+    preCommit: standard
+    prePush: none
+archetype:
+  kind: generic-empty
+  packageManager: npm
+  moduleName: mailplus_intelligence
+github:
+  createRepo: false
+  reviewers:
+    - jmcte
+  codeowners:
+    - pattern: "*"
+      owners:
+        - "@jmcte"
+  autoMerge: true
+  deleteBranchOnMerge: true
+  requiredApprovals: 1
+  requiredStatusChecks:
+    - CI Gate
+  dismissStaleReviews: true
+  requireCodeOwnerReviews: true
+  requireLastPushApproval: false
+  enforceLinearHistory: true
+  allowMergeCommit: true
+  allowSquashMerge: true
+  allowRebaseMerge: true
+  repoFeatures:
+    hasIssues: true
+    hasProjects: false
+    hasWiki: false
+    hasDiscussions: false
+  security:
+    dependabot: false
+    secretScanningHints: true
+ci:
+  policy: experimental
+  runnerPolicy: hybrid-safe
+  nodeVersion: "20"
+  pythonVersion: "3.12"
+  fastChecks:
+    - secrets
+  extendedChecks:
+    - template-review
+  nightlyCron: 0 7 * * *
+  workflows:
+    prFastCi: true
+    extendedValidation: true
+    claude: true
+    pagesDeploy: false
+    ci: false
+    extras: &a1 []
+  additionalWorkflows: *a1
+agents:
+  manageCodexHome: true
+  manageClaudeHome: true
+  codexProfile: default
+  claudeProfile: default
+  enableClaudeWebEnvironment: true
+  enableClaudeDevcontainer: true
+  enableClaudeGitHubAction: true
+  sharedSkills: []
+capabilities:
+  pages:
+    enabled: false
+    provider: cloudflare-pages
+    outputDir: dist
+  release:
+    enabled: false
+    kind: none
+  docsPublish:
+    enabled: false
+  containers:
+    enabled: false
+environments:
+  dev:
+    reviewers: []
+    requireApproval: false
+    preventSelfReview: false
+    branches: []
+  stage:
+    reviewers:
+      - jmcte
+    requireApproval: true
+    preventSelfReview: true
+    branches: []
+  prod:
+    reviewers:
+      - jmcte
+    requireApproval: true
+    preventSelfReview: true
+    branches:
+      - main
