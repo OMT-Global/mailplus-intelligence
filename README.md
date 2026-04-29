@@ -11,6 +11,8 @@ MailPlus Intelligence is the intelligence layer for email, not the canonical mai
 
 The system should **reference raw mail** from MailPlus rather than duplicating raw mail into long-term memory surfaces.
 
+See [privacy, secrets, and redaction boundaries](docs/privacy-redaction-boundaries.md) for the raw-mail, metadata, cache, semantic-output, and durable-memory rules.
+
 ## Architecture
 
 ### 1. Canonical archive: MailPlus on `omt-nas`
