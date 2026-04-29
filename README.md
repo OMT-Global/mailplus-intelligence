@@ -87,6 +87,26 @@ This repo is targeting the **medium** architecture first:
 
 This gives high value without memory bloat or premature overbuilding.
 
+## Runtime baseline
+
+M0 uses a Python 3.12 package with SQLite-friendly local foundations.
+
+Python is the initial runtime because indexing, classification, and extraction work will be data-heavy and benefits from the Python ecosystem. SQLite is the initial storage foundation for local metadata/thread indexing before any live MailPlus, DSM, or NAS access is introduced.
+
+Local setup:
+
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
+```
+
+Run the fast unit-test baseline:
+
+```bash
+bash scripts/ci/run-fast-checks.sh
+```
+
 ## Phase 1 goals
 
 Phase 1 should support practical operator questions like:
