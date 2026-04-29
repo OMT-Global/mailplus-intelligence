@@ -110,6 +110,10 @@ Primary epics include:
 - memory/wiki promotion
 - phase-1 medium-architecture delivery
 
+## Agent execution
+
+- [Agent execution playbook](docs/agent-execution/playbook.md)
+
 ## Operating rule
 
 **MailPlus stores the mail. Pheidon stores the intelligence.**
