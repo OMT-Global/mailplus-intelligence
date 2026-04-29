@@ -10,7 +10,7 @@ Use this checklist after the first bootstrap render or whenever `project.bootstr
 
 ## Repo Governance
 
-- Confirm branch protection or rulesets on `main` require one approval and code owner review.
+- Confirm branch protection or rulesets on `main` require one approval, code owner review, and approval from someone other than the most recent pusher.
 - Confirm branch protection points at the `CI Gate` status.
 - Confirm `delete branch on merge` and `allow auto-merge` are enabled.
 
