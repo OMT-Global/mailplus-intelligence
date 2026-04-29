@@ -58,7 +58,7 @@ github:
     - CI Gate
   dismissStaleReviews: true
   requireCodeOwnerReviews: true
-  requireLastPushApproval: false
+  requireLastPushApproval: true
   enforceLinearHistory: true
   allowMergeCommit: true
   allowSquashMerge: true
