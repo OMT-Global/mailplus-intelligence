@@ -41,7 +41,7 @@ repo:
     prePush: none
 archetype:
   kind: generic-empty
-  packageManager: npm
+  packageManager: python
   moduleName: mailplus_intelligence
 github:
   createRepo: false

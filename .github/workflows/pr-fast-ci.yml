@@ -32,6 +32,9 @@ jobs:
         with:
           filters: |
             app:
+              - 'pyproject.toml'
+              - 'src/**'
+              - 'tests/**'
               - 'project.bootstrap.yaml'
               - 'AGENTS.md'
               - 'CLAUDE.md'
@@ -43,6 +46,9 @@ jobs:
               - 'README.md'
               - 'docs/**'
             ci:
+              - 'pyproject.toml'
+              - 'src/**'
+              - 'tests/**'
               - 'project.bootstrap.yaml'
               - 'AGENTS.md'
               - 'CLAUDE.md'
