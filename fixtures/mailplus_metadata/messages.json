@@ -1,0 +1,196 @@
+{
+  "version": 1,
+  "privacy": {
+    "source": "synthetic",
+    "raw_body_included": false,
+    "attachment_binaries_included": false
+  },
+  "messages": [
+    {
+      "fixture_id": "msg-001",
+      "message_id": "<thread-a-001@example.test>",
+      "thread_hint": "thread-a",
+      "subject": "Project Atlas kickoff",
+      "from": "alice@example.test",
+      "to": ["operator@example.test"],
+      "cc": [],
+      "date": "2026-01-05T14:00:00Z",
+      "mailbox": "Inbox",
+      "folder": "Projects/Atlas",
+      "labels": ["project"],
+      "flags": ["seen"],
+      "references": [],
+      "in_reply_to": null,
+      "attachments": [],
+      "locator": {
+        "account": "fixture-account",
+        "mailbox": "Inbox",
+        "folder": "Projects/Atlas",
+        "uid": "1001",
+        "export_id": "fixture-export-001"
+      }
+    },
+    {
+      "fixture_id": "msg-002",
+      "message_id": "<thread-a-002@example.test>",
+      "thread_hint": "thread-a",
+      "subject": "Re: Project Atlas kickoff",
+      "from": "operator@example.test",
+      "to": ["alice@example.test"],
+      "cc": ["pm@example.test"],
+      "date": "2026-01-05T14:18:00Z",
+      "mailbox": "Sent",
+      "folder": "Sent Items",
+      "labels": ["project", "sent"],
+      "flags": ["answered"],
+      "references": ["<thread-a-001@example.test>"],
+      "in_reply_to": "<thread-a-001@example.test>",
+      "attachments": [],
+      "locator": {
+        "account": "fixture-account",
+        "mailbox": "Sent",
+        "folder": "Sent Items",
+        "uid": "2001",
+        "export_id": "fixture-export-002"
+      }
+    },
+    {
+      "fixture_id": "msg-003",
+      "message_id": "<thread-a-003@example.test>",
+      "thread_hint": "thread-a",
+      "subject": "Re: Project Atlas kickoff",
+      "from": "alice@example.test",
+      "to": ["operator@example.test"],
+      "cc": ["pm@example.test"],
+      "date": "2026-01-05T15:02:00Z",
+      "mailbox": "Inbox",
+      "folder": "Projects/Atlas",
+      "labels": ["project", "needs-review"],
+      "flags": [],
+      "references": ["<thread-a-001@example.test>", "<thread-a-002@example.test>"],
+      "in_reply_to": "<thread-a-002@example.test>",
+      "attachments": [
+        {
+          "filename": "atlas-plan.txt",
+          "content_type": "text/plain",
+          "size_bytes": 128
+        }
+      ],
+      "locator": {
+        "account": "fixture-account",
+        "mailbox": "Inbox",
+        "folder": "Projects/Atlas",
+        "uid": "1002",
+        "export_id": "fixture-export-003"
+      }
+    },
+    {
+      "fixture_id": "msg-004",
+      "message_id": "<forward-001@example.test>",
+      "thread_hint": "thread-forward",
+      "subject": "Fwd: Billing portal access",
+      "from": "billing@example.test",
+      "to": ["operator@example.test"],
+      "cc": [],
+      "date": "2026-01-06T09:30:00Z",
+      "mailbox": "Inbox",
+      "folder": "Admin/Billing",
+      "labels": ["admin", "financial"],
+      "flags": ["flagged"],
+      "references": [],
+      "in_reply_to": null,
+      "attachments": [],
+      "locator": {
+        "account": "fixture-account",
+        "mailbox": "Inbox",
+        "folder": "Admin/Billing",
+        "uid": "1003",
+        "export_id": "fixture-export-004"
+      }
+    },
+    {
+      "fixture_id": "msg-005-original",
+      "message_id": "<duplicate-001@example.test>",
+      "thread_hint": "thread-duplicate",
+      "subject": "Legal intake packet",
+      "from": "legal@example.test",
+      "to": ["operator@example.test"],
+      "cc": [],
+      "date": "2026-01-07T11:00:00Z",
+      "mailbox": "Inbox",
+      "folder": "Legal",
+      "labels": ["legal"],
+      "flags": [],
+      "references": [],
+      "in_reply_to": null,
+      "attachments": [
+        {
+          "filename": "intake.pdf",
+          "content_type": "application/pdf",
+          "size_bytes": 2048
+        }
+      ],
+      "locator": {
+        "account": "fixture-account",
+        "mailbox": "Inbox",
+        "folder": "Legal",
+        "uid": "1004",
+        "export_id": "fixture-export-005"
+      }
+    },
+    {
+      "fixture_id": "msg-005-duplicate",
+      "message_id": "<duplicate-001@example.test>",
+      "thread_hint": "thread-duplicate",
+      "subject": "Legal intake packet",
+      "from": "legal@example.test",
+      "to": ["operator@example.test"],
+      "cc": [],
+      "date": "2026-01-07T11:00:00Z",
+      "mailbox": "Archive",
+      "folder": "Archive/Legal",
+      "labels": ["legal", "archived"],
+      "flags": ["seen"],
+      "references": [],
+      "in_reply_to": null,
+      "attachments": [
+        {
+          "filename": "intake.pdf",
+          "content_type": "application/pdf",
+          "size_bytes": 2048
+        }
+      ],
+      "locator": {
+        "account": "fixture-account",
+        "mailbox": "Archive",
+        "folder": "Archive/Legal",
+        "uid": "3001",
+        "export_id": "fixture-export-006"
+      }
+    },
+    {
+      "fixture_id": "msg-006-malformed",
+      "message_id": "<malformed-optional@example.test>",
+      "thread_hint": "thread-malformed",
+      "subject": "Travel receipt",
+      "from": "receipts@example.test",
+      "to": [],
+      "cc": [],
+      "date": "2026-01-08T17:45:00Z",
+      "mailbox": "Inbox",
+      "folder": "Receipts",
+      "labels": ["travel", "receipt"],
+      "flags": [],
+      "references": ["not-a-message-id"],
+      "in_reply_to": "",
+      "attachments": [],
+      "locator": {
+        "account": "fixture-account",
+        "mailbox": "Inbox",
+        "folder": "Receipts",
+        "uid": "1005",
+        "export_id": "fixture-export-007"
+      }
+    }
+  ]
+}
