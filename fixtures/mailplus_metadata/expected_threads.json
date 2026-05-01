@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "threads": [
+    {
+      "thread_id": "thread-a",
+      "message_fixture_ids": ["msg-001", "msg-002", "msg-003"],
+      "confidence": "high",
+      "basis": ["message-id", "references", "in-reply-to"]
+    },
+    {
+      "thread_id": "thread-forward",
+      "message_fixture_ids": ["msg-004"],
+      "confidence": "medium",
+      "basis": ["subject-forward-prefix", "distinct-message-id"]
+    },
+    {
+      "thread_id": "thread-duplicate",
+      "message_fixture_ids": ["msg-005-original", "msg-005-duplicate"],
+      "confidence": "high",
+      "basis": ["duplicate-message-id", "locator-variant"]
+    },
+    {
+      "thread_id": "thread-malformed",
+      "message_fixture_ids": ["msg-006-malformed"],
+      "confidence": "low",
+      "basis": ["malformed-optional-headers"]
+    }
+  ]
+}
