@@ -14,4 +14,6 @@ if sys.version_info < (3, 12):
     raise SystemExit("Python 3.12 or newer is required")
 PY
 
+bash scripts/check-detect-secrets.sh --all-files
+bash scripts/ci/check-ci-contract.sh
 PYTHONPATH=src "$PYTHON_BIN" -m unittest discover -s tests -v

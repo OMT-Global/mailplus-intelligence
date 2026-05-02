@@ -78,8 +78,10 @@ ci:
   pythonVersion: "3.12"
   fastChecks:
     - secrets
+    - unit-tests
   extendedChecks:
     - template-review
+    - fixture-regression
   nightlyCron: 0 7 * * *
   workflows:
     prFastCi: true
