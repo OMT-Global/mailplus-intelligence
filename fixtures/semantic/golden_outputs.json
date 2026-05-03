@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "artifacts": [
+    {
+      "artifact_id": "summary-001",
+      "artifact_type": "thread_summary",
+      "source_thread_key": "thread-a",
+      "source_message_ids": ["<thread-a-001@example.test>"],
+      "source_locators": [{"locator_export_id": "fixture-export-001", "locator_uid": "1001"}],
+      "evidence_refs": ["subject"],
+      "summary": "Project kickoff requires review.",
+      "confidence": "medium",
+      "review_status": "candidate"
+    },
+    {
+      "artifact_id": "obligation-001",
+      "artifact_type": "obligation",
+      "source_thread_key": "thread-a",
+      "source_message_ids": ["<thread-a-002@example.test>"],
+      "source_locators": [{"locator_export_id": "fixture-export-002", "locator_uid": "2001"}],
+      "evidence_refs": ["subject"],
+      "summary": "Operator owes a follow-up.",
+      "confidence": "medium",
+      "review_status": "review_needed"
+    }
+  ]
+}
