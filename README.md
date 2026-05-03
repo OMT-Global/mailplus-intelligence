@@ -15,6 +15,12 @@ See [privacy, secrets, and redaction boundaries](docs/privacy-redaction-boundari
 
 ## Architecture
 
+The canonical-store boundary is documented in
+[`docs/architecture/canonical-store-boundary.md`](docs/architecture/canonical-store-boundary.md).
+That document is the implementation guardrail for keeping MailPlus as the raw
+archive while this repo stores only structured metadata and reviewed derived
+intelligence.
+
 ### 1. Canonical archive: MailPlus on `omt-nas`
 
 MailPlus remains the source of truth for:
