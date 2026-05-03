@@ -28,6 +28,7 @@ Use this checklist after the first bootstrap render or whenever `project.bootstr
 - Shell-safe jobs may use `[self-hosted, synology, shell-only, private]`.
 - Docker, service-container, browser, and `container:` workloads stay on GitHub-hosted runners.
 - Keep PR checks cheap. Add heavy validation to `scripts/ci/run-extended-validation.sh` instead of the PR lane.
+- See `docs/bootstrap/ci-validation.md` for the current fast versus extended validation contract.
 
 
 ## Home Profiles
