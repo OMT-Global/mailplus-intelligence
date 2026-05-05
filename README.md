@@ -4,7 +4,7 @@ MailPlus Intelligence is the intelligence layer for email, not the canonical mai
 
 ## Core model
 
-- **Canonical raw store:** MailPlus on `omt-nas`
+- **Canonical raw store:** the operator's MailPlus deployment
 - **Structured recall layer:** metadata + thread index
 - **Semantic layer:** selected high-value summaries, entities, obligations, and events
 - **Durable memory surfaces:** wiki, `memory/`, `MEMORY.md`, and approved reminders/tasks
@@ -21,7 +21,7 @@ That document is the implementation guardrail for keeping MailPlus as the raw
 archive while this repo stores only structured metadata and reviewed derived
 intelligence.
 
-### 1. Canonical archive: MailPlus on `omt-nas`
+### 1. Canonical archive: MailPlus
 
 MailPlus remains the source of truth for:
 
@@ -144,4 +144,4 @@ Primary epics include:
 
 ## Operating rule
 
-**MailPlus stores the mail. Pheidon stores the intelligence.**
+**MailPlus stores the mail. MailPlus Intelligence stores reviewed derived intelligence.**

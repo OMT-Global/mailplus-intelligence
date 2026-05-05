@@ -1,6 +1,6 @@
 # Privacy, Secrets, and Redaction Boundaries
 
-This project treats MailPlus on `omt-nas` as the canonical raw-mail system. MailPlus Intelligence may index, summarize, and promote derived intelligence, but it must not become a second raw-mail archive or a durable store for secrets.
+This project treats the operator's MailPlus deployment as the canonical raw-mail system. MailPlus Intelligence may index, summarize, and promote derived intelligence, but it must not become a second raw-mail archive or a durable store for secrets.
 
 ## Data Classes
 

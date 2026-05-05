@@ -1,7 +1,7 @@
 # Canonical Store Boundary
 
-MailPlus Intelligence treats MailPlus on `omt-nas` as the canonical raw mail
-archive. This repository owns the derived intelligence layer around that
+MailPlus Intelligence treats the operator's MailPlus deployment as the canonical
+raw mail archive. This repository owns the derived intelligence layer around that
 archive: metadata indexing, retrieval workflows, selected semantic extraction,
 and reviewed promotion into memory or wiki surfaces.
 
@@ -50,5 +50,5 @@ Implementation work should keep these checks visible:
 - live MailPlus and DSM access remains credential-gated
 - promotion into memory, wiki, or reminders requires review gates
 
-This boundary lets MailPlus keep archival truth while Pheidon provides
-high-signal recall and operator intelligence.
+This boundary lets MailPlus keep archival truth while MailPlus Intelligence
+provides high-signal recall and operator intelligence.

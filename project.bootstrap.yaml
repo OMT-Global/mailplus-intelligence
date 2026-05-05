@@ -3,7 +3,7 @@ project:
   name: mailplus-intelligence
   displayName: MailPlus Intelligence
   description: Intelligence and automation workspace for MailPlus-related tooling.
-  visibility: private
+  visibility: public
   owner: OMT-Global
   defaultBranch: main
 repo:
@@ -13,6 +13,9 @@ repo:
     - AGENTS.md
     - CLAUDE.md
     - CODEOWNERS
+    - CONTRIBUTING.md
+    - LICENSE
+    - SECURITY.md
     - .githooks/**
     - .devcontainer/**
     - .github/workflows/pr-fast-ci.yml
@@ -26,8 +29,8 @@ repo:
     - docs/bootstrap/**
   docs:
     readme: true
-    contributing: false
-    security: false
+    contributing: true
+    security: true
   templates:
     pullRequest: standard
     issueTemplates:
