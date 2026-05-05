@@ -1,0 +1,280 @@
+{
+  "version": 1,
+  "privacy": {
+    "source": "synthetic",
+    "raw_body_included": false,
+    "attachment_binaries_included": false
+  },
+  "messages": [
+    {
+      "fixture_id": "suppress-newsletter-digest",
+      "family": "newsletter_digest",
+      "expected_action": "suppress",
+      "message_id": "<noise-newsletter@example.test>",
+      "subject": "Weekly platform digest",
+      "from": "newsletter@example.test",
+      "to": ["operator@example.test"],
+      "date": "2026-02-01T13:00:00Z",
+      "mailbox": "Inbox",
+      "folder": "Newsletters",
+      "labels": ["newsletter"],
+      "flags": [],
+      "headers": {
+        "List-Unsubscribe": "<mailto:unsubscribe@example.test>"
+      },
+      "locator": {
+        "account": "fixture-account",
+        "mailbox": "Inbox",
+        "folder": "Newsletters",
+        "uid": "4001",
+        "export_id": "noise-export-001"
+      }
+    },
+    {
+      "fixture_id": "allow-newsletter-lookalike",
+      "family": "newsletter_digest",
+      "expected_action": "allow",
+      "message_id": "<allow-newsletter@example.test>",
+      "subject": "Digest feedback from Athena",
+      "from": "athena@example.test",
+      "to": ["operator@example.test"],
+      "date": "2026-02-01T14:00:00Z",
+      "mailbox": "Inbox",
+      "folder": "Projects/Atlas",
+      "labels": ["project"],
+      "flags": [],
+      "headers": {},
+      "locator": {
+        "account": "fixture-account",
+        "mailbox": "Inbox",
+        "folder": "Projects/Atlas",
+        "uid": "4002",
+        "export_id": "noise-export-002"
+      }
+    },
+    {
+      "fixture_id": "suppress-promotion",
+      "family": "promotion",
+      "expected_action": "suppress",
+      "message_id": "<noise-promo@example.test>",
+      "subject": "Limited time discount for your account",
+      "from": "promo@example.test",
+      "to": ["operator@example.test"],
+      "date": "2026-02-02T13:00:00Z",
+      "mailbox": "Inbox",
+      "folder": "Promotions",
+      "labels": ["promo"],
+      "flags": [],
+      "headers": {},
+      "locator": {
+        "account": "fixture-account",
+        "mailbox": "Inbox",
+        "folder": "Promotions",
+        "uid": "4003",
+        "export_id": "noise-export-003"
+      }
+    },
+    {
+      "fixture_id": "review-promotion-financial-lookalike",
+      "family": "promotion",
+      "expected_action": "review_needed",
+      "message_id": "<review-promo@example.test>",
+      "subject": "Offer terms for acquisition review",
+      "from": "finance@example.test",
+      "to": ["operator@example.test"],
+      "date": "2026-02-02T14:00:00Z",
+      "mailbox": "Inbox",
+      "folder": "Admin/Finance",
+      "labels": ["financial"],
+      "flags": ["flagged"],
+      "headers": {},
+      "locator": {
+        "account": "fixture-account",
+        "mailbox": "Inbox",
+        "folder": "Admin/Finance",
+        "uid": "4004",
+        "export_id": "noise-export-004"
+      }
+    },
+    {
+      "fixture_id": "suppress-receipt",
+      "family": "receipt",
+      "expected_action": "suppress",
+      "message_id": "<noise-receipt@example.test>",
+      "subject": "Receipt for your ride",
+      "from": "receipts@example.test",
+      "to": ["operator@example.test"],
+      "date": "2026-02-03T13:00:00Z",
+      "mailbox": "Inbox",
+      "folder": "Receipts",
+      "labels": ["receipt"],
+      "flags": [],
+      "headers": {},
+      "locator": {
+        "account": "fixture-account",
+        "mailbox": "Inbox",
+        "folder": "Receipts",
+        "uid": "4005",
+        "export_id": "noise-export-005"
+      }
+    },
+    {
+      "fixture_id": "allow-receipt-lookalike",
+      "family": "receipt",
+      "expected_action": "allow",
+      "message_id": "<allow-receipt@example.test>",
+      "subject": "Please review receipt categorization policy",
+      "from": "ops@example.test",
+      "to": ["operator@example.test"],
+      "date": "2026-02-03T14:00:00Z",
+      "mailbox": "Inbox",
+      "folder": "Projects/Atlas",
+      "labels": ["project"],
+      "flags": [],
+      "headers": {},
+      "locator": {
+        "account": "fixture-account",
+        "mailbox": "Inbox",
+        "folder": "Projects/Atlas",
+        "uid": "4006",
+        "export_id": "noise-export-006"
+      }
+    },
+    {
+      "fixture_id": "suppress-automation-status",
+      "family": "automation_status",
+      "expected_action": "suppress",
+      "message_id": "<noise-status@example.test>",
+      "subject": "Monitor status resolved",
+      "from": "status@example.test",
+      "to": ["operator@example.test"],
+      "date": "2026-02-04T13:00:00Z",
+      "mailbox": "Inbox",
+      "folder": "Alerts",
+      "labels": ["status"],
+      "flags": [],
+      "headers": {
+        "Auto-Submitted": "auto-generated"
+      },
+      "locator": {
+        "account": "fixture-account",
+        "mailbox": "Inbox",
+        "folder": "Alerts",
+        "uid": "4007",
+        "export_id": "noise-export-007"
+      }
+    },
+    {
+      "fixture_id": "allow-automation-lookalike",
+      "family": "automation_status",
+      "expected_action": "allow",
+      "message_id": "<allow-status@example.test>",
+      "subject": "Manual status update for board review",
+      "from": "pm@example.test",
+      "to": ["operator@example.test"],
+      "date": "2026-02-04T14:00:00Z",
+      "mailbox": "Inbox",
+      "folder": "Projects/Atlas",
+      "labels": ["project"],
+      "flags": [],
+      "headers": {},
+      "locator": {
+        "account": "fixture-account",
+        "mailbox": "Inbox",
+        "folder": "Projects/Atlas",
+        "uid": "4008",
+        "export_id": "noise-export-008"
+      }
+    },
+    {
+      "fixture_id": "suppress-routine-bulk-notice",
+      "family": "routine_bulk_notice",
+      "expected_action": "suppress",
+      "message_id": "<noise-login@example.test>",
+      "subject": "New login notice",
+      "from": "accounts@example.test",
+      "to": ["operator@example.test"],
+      "date": "2026-02-05T13:00:00Z",
+      "mailbox": "Inbox",
+      "folder": "Account Notices",
+      "labels": ["account"],
+      "flags": [],
+      "headers": {},
+      "locator": {
+        "account": "fixture-account",
+        "mailbox": "Inbox",
+        "folder": "Account Notices",
+        "uid": "4009",
+        "export_id": "noise-export-009"
+      }
+    },
+    {
+      "fixture_id": "allow-routine-notice-lookalike",
+      "family": "routine_bulk_notice",
+      "expected_action": "allow",
+      "message_id": "<allow-login@example.test>",
+      "subject": "Login review with security counsel",
+      "from": "security@example.test",
+      "to": ["operator@example.test"],
+      "date": "2026-02-05T14:00:00Z",
+      "mailbox": "Inbox",
+      "folder": "Security",
+      "labels": ["project"],
+      "flags": [],
+      "headers": {},
+      "locator": {
+        "account": "fixture-account",
+        "mailbox": "Inbox",
+        "folder": "Security",
+        "uid": "4010",
+        "export_id": "noise-export-010"
+      }
+    },
+    {
+      "fixture_id": "suppress-no-reply-bulk",
+      "family": "no_reply_bulk",
+      "expected_action": "suppress",
+      "message_id": "<noise-noreply@example.test>",
+      "subject": "Community update",
+      "from": "no-reply@example.test",
+      "to": ["operator@example.test"],
+      "date": "2026-02-06T13:00:00Z",
+      "mailbox": "Inbox",
+      "folder": "Bulk",
+      "labels": ["bulk"],
+      "flags": [],
+      "headers": {
+        "Precedence": "bulk"
+      },
+      "locator": {
+        "account": "fixture-account",
+        "mailbox": "Inbox",
+        "folder": "Bulk",
+        "uid": "4011",
+        "export_id": "noise-export-011"
+      }
+    },
+    {
+      "fixture_id": "review-no-reply-legal-lookalike",
+      "family": "no_reply_bulk",
+      "expected_action": "review_needed",
+      "message_id": "<allow-noreply@example.test>",
+      "subject": "Contract notice requires response",
+      "from": "no-reply@example.test",
+      "to": ["operator@example.test"],
+      "date": "2026-02-06T14:00:00Z",
+      "mailbox": "Inbox",
+      "folder": "Legal",
+      "labels": ["legal"],
+      "flags": [],
+      "headers": {},
+      "locator": {
+        "account": "fixture-account",
+        "mailbox": "Inbox",
+        "folder": "Legal",
+        "uid": "4012",
+        "export_id": "noise-export-012"
+      }
+    }
+  ]
+}
