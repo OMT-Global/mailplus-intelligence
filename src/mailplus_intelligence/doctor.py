@@ -1,0 +1,132 @@
+"""Fixture-mode preflight checks for local agent work."""
+
+from __future__ import annotations
+
+import os
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+
+from .fixtures import load_metadata_fixture_corpus
+from .runtime import default_runtime_profile
+from .schema import apply_schema_v0, current_schema_version
+from .sqlite import connect_sqlite
+
+
+@dataclass(frozen=True)
+class DoctorCheck:
+    """Single preflight check result."""
+
+    name: str
+    status: str
+    message: str
+
+
+@dataclass(frozen=True)
+class DoctorReport:
+    """Aggregated preflight report."""
+
+    checks: tuple[DoctorCheck, ...]
+
+    @property
+    def ok(self) -> bool:
+        return all(check.status in {"ok", "gated"} for check in self.checks)
+
+
+def run_fixture_doctor(project_root: str | Path = ".") -> DoctorReport:
+    """Run local fixture-mode readiness checks."""
+
+    root = Path(project_root)
+    checks: list[DoctorCheck] = []
+
+    profile = default_runtime_profile()
+    checks.append(
+        DoctorCheck(
+            "runtime",
+            "ok" if sys.version_info >= (3, 12) else "fail",
+            f"python {sys.version_info.major}.{sys.version_info.minor}; expected >=3.12",
+        )
+    )
+    checks.append(
+        DoctorCheck(
+            "storage",
+            "ok" if profile.storage_engine == "sqlite" else "fail",
+            f"selected storage engine: {profile.storage_engine}",
+        )
+    )
+
+    manifest = root / "project.bootstrap.yaml"
+    checks.append(
+        DoctorCheck(
+            "manifest",
+            "ok" if manifest.exists() else "fail",
+            "project.bootstrap.yaml present" if manifest.exists() else "missing project.bootstrap.yaml",
+        )
+    )
+
+    fixture_dir = root / "fixtures" / "mailplus_metadata"
+    try:
+        corpus = load_metadata_fixture_corpus(fixture_dir)
+        checks.append(
+            DoctorCheck(
+                "fixtures",
+                "ok",
+                f"loaded metadata fixture corpus with {len(corpus.messages)} messages",
+            )
+        )
+    except Exception as exc:
+        checks.append(DoctorCheck("fixtures", "fail", f"fixture corpus unavailable: {exc}"))
+
+    try:
+        connection = connect_sqlite()
+        try:
+            apply_schema_v0(connection)
+            checks.append(
+                DoctorCheck(
+                    "schema",
+                    "ok",
+                    f"metadata schema user_version={current_schema_version(connection)}",
+                )
+            )
+        finally:
+            connection.close()
+    except Exception as exc:
+        checks.append(DoctorCheck("schema", "fail", f"schema bootstrap failed: {exc}"))
+
+    live_keys = ("MAILPLUS_URL", "MAILPLUS_USERNAME", "MAILPLUS_PASSWORD")
+    missing_live_keys = [key for key in live_keys if not os.environ.get(key)]
+    checks.append(
+        DoctorCheck(
+            "live-mailplus",
+            "gated" if missing_live_keys else "ok",
+            (
+                "live MailPlus credentials intentionally unavailable in fixture mode"
+                if missing_live_keys
+                else "live MailPlus credential environment is present"
+            ),
+        )
+    )
+
+    return DoctorReport(tuple(checks))
+
+
+def format_doctor_report(report: DoctorReport) -> str:
+    """Render a compact operator-facing doctor report."""
+
+    lines = ["MailPlus Intelligence fixture doctor"]
+    for check in report.checks:
+        lines.append(f"- {check.status}: {check.name}: {check.message}")
+    lines.append(f"result: {'ok' if report.ok else 'failed'}")
+    return "\n".join(lines)
+
+
+def main() -> int:
+    """CLI entry point for fixture-mode preflight."""
+
+    report = run_fixture_doctor()
+    print(format_doctor_report(report))
+    return 0 if report.ok else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
