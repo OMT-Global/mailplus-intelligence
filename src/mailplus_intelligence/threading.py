@@ -68,14 +68,17 @@ def reconstruct_fixture_threads(messages: tuple[dict[str, Any], ...] | list[dict
             message_id_owner[message_id] = fixture_id
             bases[fixture_id].add("message-id")
 
-        link_values = list(message.get("references", ()))
-        if message.get("in_reply_to"):
-            link_values.append(message["in_reply_to"])
-        for linked_message_id in link_values:
+        for linked_message_id in message.get("references", ()):
             linked = by_message_id.get(str(linked_message_id))
             if linked:
                 union(str(linked["fixture_id"]), fixture_id)
-                bases[fixture_id].update({"references", "in-reply-to"})
+                bases[fixture_id].add("references")
+
+        if message.get("in_reply_to"):
+            linked = by_message_id.get(str(message["in_reply_to"]))
+            if linked:
+                union(str(linked["fixture_id"]), fixture_id)
+                bases[fixture_id].add("in-reply-to")
 
     subject_groups: dict[str, list[dict[str, Any]]] = {}
     for message in messages:
@@ -84,9 +87,14 @@ def reconstruct_fixture_threads(messages: tuple[dict[str, Any], ...] | list[dict
         if len(group) > 1:
             root = str(group[0]["fixture_id"])
             for message in group[1:]:
-                if not message.get("references") and not message.get("in_reply_to"):
-                    union(root, str(message["fixture_id"]))
-                    bases[str(message["fixture_id"])].add("subject-fallback")
+                fixture_id = str(message["fixture_id"])
+                if (
+                    not message.get("references")
+                    and not message.get("in_reply_to")
+                    and find(root) != find(fixture_id)
+                ):
+                    union(root, fixture_id)
+                    bases[fixture_id].add("subject-fallback")
 
     grouped: dict[str, list[str]] = {}
     basis_by_root: dict[str, set[str]] = {}

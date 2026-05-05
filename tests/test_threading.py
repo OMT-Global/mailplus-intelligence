@@ -28,7 +28,34 @@ class ThreadReconstructionTests(unittest.TestCase):
             actual["thread-duplicate"].message_fixture_ids,
             ("msg-005-original", "msg-005-duplicate"),
         )
+        self.assertEqual(actual["thread-duplicate"].confidence, "high")
         self.assertIn("duplicate-message-id", actual["thread-duplicate"].basis)
+        self.assertNotIn("subject-fallback", actual["thread-duplicate"].basis)
+
+    def test_link_basis_records_only_resolved_header_type(self) -> None:
+        messages = [
+            {
+                "fixture_id": "msg-parent",
+                "message_id": "<parent@example.test>",
+                "thread_hint": "thread-link-basis",
+                "subject": "Thread basis",
+                "references": [],
+                "in_reply_to": None,
+            },
+            {
+                "fixture_id": "msg-child",
+                "message_id": "<child@example.test>",
+                "thread_hint": "thread-link-basis",
+                "subject": "Re: Thread basis",
+                "references": ["<parent@example.test>"],
+                "in_reply_to": None,
+            },
+        ]
+
+        actual = {thread.thread_id: thread for thread in reconstruct_fixture_threads(messages)}
+
+        self.assertIn("references", actual["thread-link-basis"].basis)
+        self.assertNotIn("in-reply-to", actual["thread-link-basis"].basis)
 
     def test_malformed_optional_headers_are_low_confidence(self) -> None:
         corpus = load_metadata_fixture_corpus("fixtures/mailplus_metadata")
