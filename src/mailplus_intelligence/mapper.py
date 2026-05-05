@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -50,6 +51,16 @@ class MapperResult:
     issues: tuple[NormalizationIssue, ...]
 
 
+def _reference_values(value: Any) -> tuple[tuple[Any, ...], bool]:
+    """Return iterable reference values plus whether the shape was malformed."""
+
+    if value is None:
+        return (), True
+    if isinstance(value, str | bytes) or not isinstance(value, Sequence):
+        return (), True
+    return tuple(value), False
+
+
 def map_fixture_messages(messages: list[dict[str, Any]] | tuple[dict[str, Any], ...]) -> MapperResult:
     """Map fixture messages into normalized records and non-fatal issues."""
 
@@ -83,12 +94,13 @@ def map_fixture_messages(messages: list[dict[str, Any]] | tuple[dict[str, Any], 
         else:
             seen_message_ids[message_id] = fixture_id
 
+        reference_values, malformed_reference_shape = _reference_values(message.get("references", ()))
         references = tuple(
             reference
-            for reference in (str(value).strip() for value in message.get("references", ()))
+            for reference in (str(value).strip() for value in reference_values)
             if reference.startswith("<") and reference.endswith(">")
         )
-        if len(references) != len(message.get("references", ())):
+        if malformed_reference_shape or len(references) != len(reference_values):
             issues.append(
                 NormalizationIssue(
                     fixture_id,

@@ -39,6 +39,48 @@ class FixtureMapperTests(unittest.TestCase):
         self.assertIsNone(malformed.in_reply_to)
         self.assertTrue(any(issue.code == "malformed_reference" for issue in result.issues))
 
+    def test_treats_null_references_as_malformed_optional_value(self) -> None:
+        message = {
+            "fixture_id": "msg-null-references",
+            "message_id": "<null-references@example.test>",
+            "subject": "Null references",
+            "from": "alice@example.test",
+            "to": ["operator@example.test"],
+            "date": "2026-01-01T00:00:00Z",
+            "mailbox": "operator@example.test",
+            "folder": "Inbox",
+            "locator": {"uid": "1"},
+            "references": None,
+        }
+
+        result = map_fixture_messages([message])
+
+        self.assertEqual(result.records[0].references, ())
+        self.assertEqual(len(result.issues), 1)
+        self.assertEqual(result.issues[0].code, "malformed_reference")
+        self.assertEqual(result.issues[0].fixture_id, "msg-null-references")
+
+    def test_treats_scalar_references_as_malformed_optional_value(self) -> None:
+        message = {
+            "fixture_id": "msg-scalar-references",
+            "message_id": "<scalar-references@example.test>",
+            "subject": "Scalar references",
+            "from": "alice@example.test",
+            "to": ["operator@example.test"],
+            "date": "2026-01-01T00:00:00Z",
+            "mailbox": "operator@example.test",
+            "folder": "Inbox",
+            "locator": {"uid": "2"},
+            "references": "<not-an-array@example.test>",
+        }
+
+        result = map_fixture_messages([message])
+
+        self.assertEqual(result.records[0].references, ())
+        self.assertEqual(len(result.issues), 1)
+        self.assertEqual(result.issues[0].code, "malformed_reference")
+        self.assertEqual(result.issues[0].fixture_id, "msg-scalar-references")
+
 
 if __name__ == "__main__":
     unittest.main()
