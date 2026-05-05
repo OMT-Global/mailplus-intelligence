@@ -37,6 +37,26 @@ class ThreadReconstructionTests(unittest.TestCase):
         self.assertEqual(actual["thread-malformed"].confidence, "low")
         self.assertIn("malformed-optional-headers", actual["thread-malformed"].basis)
 
+    def test_malformed_in_reply_to_without_malformed_references_is_low_confidence(self) -> None:
+        messages = [
+            {
+                "fixture_id": "msg-malformed-in-reply-to",
+                "message_id": "<malformed-in-reply-to@example.test>",
+                "thread_hint": "thread-malformed-in-reply-to",
+                "subject": "Malformed in-reply-to",
+                "references": [],
+                "in_reply_to": "not-a-message-id",
+            }
+        ]
+
+        actual = {thread.thread_id: thread for thread in reconstruct_fixture_threads(messages)}
+
+        self.assertEqual(actual["thread-malformed-in-reply-to"].confidence, "low")
+        self.assertIn(
+            "malformed-optional-headers",
+            actual["thread-malformed-in-reply-to"].basis,
+        )
+
     def test_subject_normalization_is_conservative(self) -> None:
         self.assertEqual(normalize_subject("Re: Fwd: Project Atlas kickoff"), "project atlas kickoff")
 

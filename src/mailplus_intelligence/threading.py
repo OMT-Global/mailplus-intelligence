@@ -20,6 +20,10 @@ class ReconstructedThread:
 _SUBJECT_PREFIX_RE = re.compile(r"^(re|fw|fwd):\s*", re.IGNORECASE)
 
 
+def _is_malformed_optional_message_id(value: Any) -> bool:
+    return bool(value) and not str(value).startswith("<")
+
+
 def normalize_subject(subject: str) -> str:
     """Normalize conservative reply/forward prefixes for subject fallback."""
 
@@ -91,7 +95,9 @@ def reconstruct_fixture_threads(messages: tuple[dict[str, Any], ...] | list[dict
         root = find(fixture_id)
         grouped.setdefault(root, []).append(fixture_id)
         basis_by_root.setdefault(root, set()).update(bases[fixture_id])
-        if any(not str(value).startswith("<") for value in message.get("references", ())):
+        if any(_is_malformed_optional_message_id(value) for value in message.get("references", ())) or (
+            _is_malformed_optional_message_id(message.get("in_reply_to"))
+        ):
             basis_by_root[root].add("malformed-optional-headers")
         if str(message["subject"]).lower().startswith(("fw:", "fwd:")):
             basis_by_root[root].add("subject-forward-prefix")
