@@ -156,6 +156,56 @@ def cmd_export(args: argparse.Namespace) -> int:
     return 0
 
 
+# ── sync ─────────────────────────────────────────────────────────────────────
+
+
+def cmd_sync(args: argparse.Namespace) -> int:
+    from .scheduler import get_job_status, list_jobs
+    from .sync import get_checkpoint
+
+    conn = _setup_db(args.db)
+    try:
+        if args.sync_action == "status":
+            if args.job:
+                status = get_job_status(conn, args.job)
+                if status is None:
+                    print(f"No job registered: {args.job}")
+                    return 1
+                jobs = [status]
+            else:
+                jobs = list_jobs(conn)
+            if args.json:
+                print(json.dumps([j.__dict__ for j in jobs], indent=2))
+            else:
+                if not jobs:
+                    print("No sync jobs registered.")
+                for j in jobs:
+                    lock_str = f"LOCKED by {j.lock_holder}" if j.locked else "unlocked"
+                    print(f"{j.job_name}  [{lock_str}]")
+                    print(f"  last run:     {j.last_run_at or 'never'}")
+                    print(f"  last success: {j.last_success_at or 'never'}")
+
+        elif args.sync_action == "checkpoint":
+            source = args.source or "fixture-corpus"
+            cp = get_checkpoint(conn, source)
+            if cp is None:
+                print(f"No checkpoint for source: {source}")
+                return 1
+            if args.json:
+                print(json.dumps(cp, indent=2))
+            else:
+                print(f"source:         {cp.get('source_name')}")
+                print(f"cursor:         {cp.get('cursor') or '(none)'}")
+                print(f"last attempt:   {cp.get('last_attempt_at') or 'never'}")
+                print(f"last success:   {cp.get('last_success_at') or 'never'}")
+        else:
+            print("Usage: mpi sync {status|checkpoint}")
+            return 1
+    finally:
+        conn.close()
+    return 0
+
+
 # ── doctor ────────────────────────────────────────────────────────────────────
 
 def cmd_doctor(args: argparse.Namespace) -> int:
@@ -223,6 +273,14 @@ def build_parser() -> argparse.ArgumentParser:
     ep = sub.add_parser("export", help="Dry-run export of approved candidates")
     ep.add_argument("--output", default="./export-artifacts", help="Output directory")
 
+    # sync
+    syp = sub.add_parser("sync", help="Sync job status and checkpoint inspection")
+    sya = syp.add_subparsers(dest="sync_action")
+    ss = sya.add_parser("status", help="List scheduler job statuses")
+    ss.add_argument("--job", help="Filter by job name")
+    sc = sya.add_parser("checkpoint", help="Show sync checkpoint for a source")
+    sc.add_argument("--source", help="Source name (default: fixture-corpus)")
+
     # doctor
     dp = sub.add_parser("doctor", help="Run fixture-mode preflight checks")
     dp.add_argument("--project-root", dest="project_root", default=".")
@@ -244,6 +302,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_export(args)
     elif args.command == "doctor":
         return cmd_doctor(args)
+    elif args.command == "sync":
+        return cmd_sync(args)
     else:
         parser.print_help()
         return 1
