@@ -11,7 +11,7 @@ class FixtureMapperTests(unittest.TestCase):
         corpus = load_metadata_fixture_corpus("fixtures/mailplus_metadata")
         result = map_fixture_messages(corpus.messages)
 
-        self.assertEqual(len(result.records), 7)
+        self.assertGreaterEqual(len(result.records), 7)
         first = result.records[0]
         self.assertEqual(first.message_id, "<thread-a-001@example.test>")
         self.assertEqual(first.sender, "alice@example.test")

@@ -17,6 +17,17 @@ class NormalizationIssue:
 
 
 @dataclass(frozen=True)
+class AttachmentRecord:
+    """Metadata for a single attachment — no binary content."""
+
+    filename: str
+    content_type: str
+    size_bytes: int
+    content_id: str | None
+    inline_flag: bool
+
+
+@dataclass(frozen=True)
 class IndexRecord:
     """Index-ready metadata record derived from a fixture message."""
 
@@ -36,6 +47,7 @@ class IndexRecord:
     in_reply_to: str | None
     has_attachments: bool
     attachment_count: int
+    attachments: tuple[AttachmentRecord, ...]
     locator_account: str
     locator_mailbox: str
     locator_folder: str
@@ -117,7 +129,17 @@ def map_fixture_messages(messages: list[dict[str, Any]] | tuple[dict[str, Any], 
         )
 
         locator = message["locator"]
-        attachments = tuple(message.get("attachments", ()))
+        raw_attachments = tuple(message.get("attachments", ()))
+        attachment_records = tuple(
+            AttachmentRecord(
+                filename=str(a.get("filename") or ""),
+                content_type=str(a.get("content_type", "")),
+                size_bytes=int(a.get("size_bytes", 0)),
+                content_id=str(a["content_id"]) if a.get("content_id") else None,
+                inline_flag=bool(a.get("inline_flag", False)),
+            )
+            for a in raw_attachments
+        )
         records.append(
             IndexRecord(
                 fixture_id=fixture_id,
@@ -134,8 +156,9 @@ def map_fixture_messages(messages: list[dict[str, Any]] | tuple[dict[str, Any], 
                 flags=tuple(message.get("flags", ())),
                 references=references,
                 in_reply_to=in_reply_to,
-                has_attachments=bool(attachments),
-                attachment_count=len(attachments),
+                has_attachments=bool(raw_attachments),
+                attachment_count=len(raw_attachments),
+                attachments=attachment_records,
                 locator_account=str(locator.get("account", "")),
                 locator_mailbox=str(locator.get("mailbox", "")),
                 locator_folder=str(locator.get("folder", "")),
