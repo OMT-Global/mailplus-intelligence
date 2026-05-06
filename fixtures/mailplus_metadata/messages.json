@@ -73,7 +73,9 @@
         {
           "filename": "atlas-plan.txt",
           "content_type": "text/plain",
-          "size_bytes": 128
+          "size_bytes": 128,
+          "content_id": null,
+          "inline_flag": false
         }
       ],
       "locator": {
@@ -127,7 +129,9 @@
         {
           "filename": "intake.pdf",
           "content_type": "application/pdf",
-          "size_bytes": 2048
+          "size_bytes": 2048,
+          "content_id": null,
+          "inline_flag": false
         }
       ],
       "locator": {
@@ -157,7 +161,9 @@
         {
           "filename": "intake.pdf",
           "content_type": "application/pdf",
-          "size_bytes": 2048
+          "size_bytes": 2048,
+          "content_id": null,
+          "inline_flag": false
         }
       ],
       "locator": {
@@ -190,6 +196,52 @@
         "folder": "Receipts",
         "uid": "1005",
         "export_id": "fixture-export-007"
+      }
+    },
+    {
+      "fixture_id": "msg-007-multi-attach",
+      "message_id": "<multi-attach-001@example.test>",
+      "thread_hint": "thread-multi-attach",
+      "subject": "Q1 financial report with inline chart",
+      "from": "finance@example.test",
+      "to": ["operator@example.test"],
+      "cc": [],
+      "date": "2026-01-10T09:00:00Z",
+      "mailbox": "Inbox",
+      "folder": "Admin/Billing",
+      "labels": ["financial"],
+      "flags": ["seen"],
+      "references": [],
+      "in_reply_to": null,
+      "attachments": [
+        {
+          "filename": "q1-report.pdf",
+          "content_type": "application/pdf",
+          "size_bytes": 51200,
+          "content_id": null,
+          "inline_flag": false
+        },
+        {
+          "filename": "chart.png",
+          "content_type": "image/png",
+          "size_bytes": 8192,
+          "content_id": "<chart-cid@example.test>",
+          "inline_flag": true
+        },
+        {
+          "filename": "",
+          "content_type": "application/octet-stream",
+          "size_bytes": 256,
+          "content_id": "<unnamed-cid@example.test>",
+          "inline_flag": false
+        }
+      ],
+      "locator": {
+        "account": "fixture-account",
+        "mailbox": "Inbox",
+        "folder": "Admin/Billing",
+        "uid": "1006",
+        "export_id": "fixture-export-008"
       }
     }
   ]
