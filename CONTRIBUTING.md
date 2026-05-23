@@ -18,6 +18,13 @@ Run the fast validation gate before opening a pull request:
 bash scripts/ci/run-fast-checks.sh
 ```
 
+Before staging local MailPlus fixtures, generated metadata, or cache-related
+changes, run the broader local scan so untracked non-ignored files are checked:
+
+```bash
+bash scripts/check-detect-secrets.sh --all-local
+```
+
 ## Pull Requests
 
 - Keep changes focused and reviewable.

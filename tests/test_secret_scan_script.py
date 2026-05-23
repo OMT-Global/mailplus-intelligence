@@ -66,10 +66,13 @@ class SecretScanScriptTests(unittest.TestCase):
 
         ci_result = self.run_scan("--all-files")
         local_result = self.run_scan("--all-files-with-untracked")
+        alias_result = self.run_scan("--all-local")
 
         self.assertEqual(ci_result.returncode, 0, ci_result.stderr)
         self.assertNotEqual(local_result.returncode, 0)
         self.assertIn("mailplus-export.eml", local_result.stderr)
+        self.assertNotEqual(alias_result.returncode, 0)
+        self.assertIn("mailplus-export.eml", alias_result.stderr)
 
     def test_mailplus_link_leak_is_detected(self) -> None:
         live_link = "https://mail.vendor.invalid/reset?" + "token=abc123"

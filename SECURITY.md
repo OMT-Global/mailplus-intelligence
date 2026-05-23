@@ -14,6 +14,12 @@ available for this repository. If private reporting is unavailable, contact the
 repository owner with a minimal description of the issue and the affected
 version or commit.
 
+Expected response: the maintainer will acknowledge a complete report within
+seven calendar days and will provide a remediation or disclosure plan once the
+impact is understood. Please include enough reproduction detail to verify the
+issue without including live credentials, raw mail, mailbox exports, or other
+private payloads.
+
 ## Data Handling Scope
 
 MailPlus Intelligence must not store raw mail bodies, attachment payloads,

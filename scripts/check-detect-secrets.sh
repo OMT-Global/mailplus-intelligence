@@ -54,12 +54,12 @@ case "$mode" in
   --all-files)
     append_tracked_files
     ;;
-  --all-files-with-untracked | --local)
+  --all-files-with-untracked | --all-local | --local)
     append_tracked_files
     append_untracked_files
     ;;
   *)
-    echo "Usage: $0 [--all-files|--staged|--all-files-with-untracked|--local]" >&2
+    echo "Usage: $0 [--all-files|--staged|--all-files-with-untracked|--all-local|--local]" >&2
     exit 2
     ;;
 esac
