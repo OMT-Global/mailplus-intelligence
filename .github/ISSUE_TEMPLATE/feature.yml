@@ -1,0 +1,36 @@
+name: Feature request
+description: Propose a scoped improvement.
+title: "[Feature]: "
+labels:
+  - feature
+body:
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: What operator problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What existing workflow or smaller change did you consider?
+    validations:
+      required: true
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - v0.1
+        - Phase 2
+        - Out of scope
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional context
+      description: Add links, examples, or constraints.
