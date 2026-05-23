@@ -14,3 +14,4 @@
 - Treat `project.bootstrap.yaml` as the source of truth for repo governance, environments, CI policy, and home profile sync.
 - If OpenClaw local skills are available, use the `omt-bootstrap` skill for manifest-first bootstrap work instead of rediscovering the workflow.
 - Review `docs/bootstrap/onboarding.md` before first merge to confirm reviewers, runner labels, and environment gates match the project.
+- The R1-R6 GitHub issues with the `release-v0.1` label drive the public v0.1.0 release.
