@@ -20,6 +20,7 @@ class DoctorCheck:
     name: str
     status: str
     message: str
+    next_step: str | None = None
 
 
 @dataclass(frozen=True)
@@ -45,6 +46,7 @@ def run_fixture_doctor(project_root: str | Path = ".") -> DoctorReport:
             "runtime",
             "ok" if sys.version_info >= (3, 12) else "fail",
             f"python {sys.version_info.major}.{sys.version_info.minor}; expected >=3.12",
+            None if sys.version_info >= (3, 12) else "Install Python 3.12 or newer.",
         )
     )
     checks.append(
@@ -52,6 +54,7 @@ def run_fixture_doctor(project_root: str | Path = ".") -> DoctorReport:
             "storage",
             "ok" if profile.storage_engine == "sqlite" else "fail",
             f"selected storage engine: {profile.storage_engine}",
+            None if profile.storage_engine == "sqlite" else "Use the default SQLite runtime profile.",
         )
     )
 
@@ -61,6 +64,7 @@ def run_fixture_doctor(project_root: str | Path = ".") -> DoctorReport:
             "manifest",
             "ok" if manifest.exists() else "fail",
             "project.bootstrap.yaml present" if manifest.exists() else "missing project.bootstrap.yaml",
+            None if manifest.exists() else "Run doctor from the repository root.",
         )
     )
 
@@ -75,7 +79,14 @@ def run_fixture_doctor(project_root: str | Path = ".") -> DoctorReport:
             )
         )
     except Exception as exc:
-        checks.append(DoctorCheck("fixtures", "fail", f"fixture corpus unavailable: {exc}"))
+        checks.append(
+            DoctorCheck(
+                "fixtures",
+                "fail",
+                f"fixture corpus unavailable: {exc}",
+                "Confirm fixtures/mailplus_metadata exists or restore the fixture corpus.",
+            )
+        )
 
     try:
         connection = connect_sqlite()
@@ -91,9 +102,16 @@ def run_fixture_doctor(project_root: str | Path = ".") -> DoctorReport:
         finally:
             connection.close()
     except Exception as exc:
-        checks.append(DoctorCheck("schema", "fail", f"schema bootstrap failed: {exc}"))
+        checks.append(
+            DoctorCheck(
+                "schema",
+                "fail",
+                f"schema bootstrap failed: {exc}",
+                "Check SQLite availability and repository migrations.",
+            )
+        )
 
-    live_keys = ("MAILPLUS_URL", "MAILPLUS_USERNAME", "MAILPLUS_PASSWORD")
+    live_keys = ("MAILPLUS_HOST", "MAILPLUS_USER", "MAILPLUS_TOKEN")
     missing_live_keys = [key for key in live_keys if not os.environ.get(key)]
     checks.append(
         DoctorCheck(
@@ -103,6 +121,11 @@ def run_fixture_doctor(project_root: str | Path = ".") -> DoctorReport:
                 "live MailPlus credentials intentionally unavailable in fixture mode"
                 if missing_live_keys
                 else "live MailPlus credential environment is present"
+            ),
+            (
+                "Set MAILPLUS_HOST, MAILPLUS_USER, and MAILPLUS_TOKEN only when testing live access."
+                if missing_live_keys
+                else None
             ),
         )
     )
@@ -116,6 +139,8 @@ def format_doctor_report(report: DoctorReport) -> str:
     lines = ["MailPlus Intelligence fixture doctor"]
     for check in report.checks:
         lines.append(f"- {check.status}: {check.name}: {check.message}")
+        if check.next_step:
+            lines.append(f"  next: {check.next_step}")
     lines.append(f"result: {'ok' if report.ok else 'failed'}")
     return "\n".join(lines)
 

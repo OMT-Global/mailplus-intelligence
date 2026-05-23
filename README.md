@@ -95,6 +95,10 @@ This repo is targeting the **medium** architecture first:
 
 This gives high value without memory bloat or premature overbuilding.
 
+Start with the [fixture-mode quickstart](docs/quickstart.md) to seed a local
+database, search fixture metadata, review extraction candidates, and run a
+dry-run export without live MailPlus credentials.
+
 ## Runtime baseline
 
 M0 uses a Python 3.12 package with SQLite-friendly local foundations.

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -19,6 +20,35 @@ def _setup_db(db_path: str):
     conn = connect_sqlite(db_path)
     apply_all_migrations(conn)
     return conn
+
+
+def _warn_if_ephemeral_db(args: argparse.Namespace) -> None:
+    if getattr(args, "db", ":memory:") != ":memory:":
+        return
+    if getattr(args, "command", None) in {"search", "thread", "queue", "export", "sync", "seed"}:
+        print(
+            "warning: --db :memory: does not persist approvals, queue decisions, or sync state; use --db ./mpi.db.",
+            file=sys.stderr,
+        )
+
+
+def _runtime_configuration_errors() -> tuple[type[BaseException], ...]:
+    errors: list[type[BaseException]] = []
+    try:
+        from .live_adapter import LiveAdapterNotConfigured
+
+        errors.append(LiveAdapterNotConfigured)
+    except ImportError:
+        pass
+
+    try:
+        from .llm_extractor import LLMNotAvailable  # type: ignore[attr-defined]
+
+        errors.append(LLMNotAvailable)
+    except (ImportError, AttributeError):
+        pass
+
+    return tuple(errors)
 
 
 # ── search ────────────────────────────────────────────────────────────────────
@@ -156,6 +186,41 @@ def cmd_export(args: argparse.Namespace) -> int:
     return 0
 
 
+# ── seed ──────────────────────────────────────────────────────────────────────
+
+def cmd_seed(args: argparse.Namespace) -> int:
+    from .extractor import extract_from_corpus
+    from .fixtures import load_metadata_fixture_corpus
+    from .queue import enqueue_candidate
+    from .sync import sync_from_fixture_corpus
+    from .threading import reconstruct_fixture_threads
+
+    conn = _setup_db(args.db)
+    try:
+        result = sync_from_fixture_corpus(conn, args.from_fixtures)
+        corpus = load_metadata_fixture_corpus(args.from_fixtures)
+        threads = reconstruct_fixture_threads(corpus.messages)
+        candidates = extract_from_corpus(threads, corpus.messages)
+
+        queued = 0
+        skipped = 0
+        for candidate in candidates:
+            try:
+                enqueue_candidate(conn, candidate.__dict__)
+                queued += 1
+            except sqlite3.IntegrityError:
+                skipped += 1
+    finally:
+        conn.close()
+
+    print(
+        "Seeded fixture corpus: "
+        f"inserted={result.inserted}, skipped={result.skipped}, "
+        f"queued={queued}, queue_skipped={skipped}."
+    )
+    return 0 if result.success else 1
+
+
 # ── sync ─────────────────────────────────────────────────────────────────────
 
 
@@ -225,12 +290,15 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 # ── parser ────────────────────────────────────────────────────────────────────
 
 def build_parser() -> argparse.ArgumentParser:
+    from . import __version__
+
     parser = argparse.ArgumentParser(
         prog="mpi",
         description="MailPlus Intelligence operator CLI",
     )
     parser.add_argument("--db", default=":memory:", help="Path to SQLite database (default: :memory:)")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = parser.add_subparsers(dest="command")
 
     # search
@@ -273,6 +341,15 @@ def build_parser() -> argparse.ArgumentParser:
     ep = sub.add_parser("export", help="Dry-run export of approved candidates")
     ep.add_argument("--output", default="./export-artifacts", help="Output directory")
 
+    # seed
+    seedp = sub.add_parser("seed", help="Seed a local DB from fixture metadata")
+    seedp.add_argument(
+        "--from-fixtures",
+        dest="from_fixtures",
+        default="fixtures/mailplus_metadata",
+        help="Fixture corpus directory",
+    )
+
     # sync
     syp = sub.add_parser("sync", help="Sync job status and checkpoint inspection")
     sya = syp.add_subparsers(dest="sync_action")
@@ -291,22 +368,35 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    _warn_if_ephemeral_db(args)
 
-    if args.command == "search":
-        return cmd_search(args)
-    elif args.command == "thread":
-        return cmd_thread(args)
-    elif args.command == "queue":
-        return cmd_queue(args)
-    elif args.command == "export":
-        return cmd_export(args)
-    elif args.command == "doctor":
-        return cmd_doctor(args)
-    elif args.command == "sync":
-        return cmd_sync(args)
-    else:
-        parser.print_help()
-        return 1
+    try:
+        if args.command == "search":
+            return cmd_search(args)
+        elif args.command == "thread":
+            return cmd_thread(args)
+        elif args.command == "queue":
+            return cmd_queue(args)
+        elif args.command == "export":
+            return cmd_export(args)
+        elif args.command == "seed":
+            return cmd_seed(args)
+        elif args.command == "doctor":
+            return cmd_doctor(args)
+        elif args.command == "sync":
+            return cmd_sync(args)
+        else:
+            parser.print_help()
+            return 1
+    except FileNotFoundError as exc:
+        print(f"error: file not found: {exc}. Check the fixture path or database parent directory.", file=sys.stderr)
+        return 2
+    except sqlite3.OperationalError as exc:
+        print(f"error: sqlite operation failed: {exc}. Check that the database parent directory exists.", file=sys.stderr)
+        return 2
+    except _runtime_configuration_errors() as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

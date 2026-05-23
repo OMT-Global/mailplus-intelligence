@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import tempfile
 import unittest
@@ -41,6 +43,21 @@ class CLIParserTests(unittest.TestCase):
     def test_no_subcommand_returns_nonzero(self):
         rc = main([])
         self.assertEqual(rc, 1)
+
+    def test_version_option_prints_package_version(self):
+        parser = build_parser()
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf), self.assertRaises(SystemExit) as raised:
+            parser.parse_args(["--version"])
+        self.assertEqual(raised.exception.code, 0)
+        self.assertIn("mpi ", buf.getvalue())
+
+    def test_memory_db_warning_is_actionable(self):
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            rc = main(["search", "--keyword", "Atlas"])
+        self.assertEqual(rc, 0)
+        self.assertIn("--db :memory: does not persist", err.getvalue())
 
 
 class CLISearchTests(unittest.TestCase):
@@ -105,6 +122,44 @@ class CLIExportTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             rc = main(["--db", ":memory:", "export", "--output", tmp])
             self.assertEqual(rc, 0)
+
+
+class CLISeedTests(unittest.TestCase):
+    def test_seed_populates_search_and_queue(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = str(Path(tmp) / "mpi.db")
+            rc = main(["--db", db_path, "seed", "--from-fixtures", "fixtures/mailplus_metadata"])
+            self.assertEqual(rc, 0)
+
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                search_rc = main(["--db", db_path, "--json", "search", "--keyword", "Atlas"])
+            self.assertEqual(search_rc, 0)
+            self.assertGreater(len(json.loads(out.getvalue())), 0)
+
+            queue_out = io.StringIO()
+            with contextlib.redirect_stdout(queue_out):
+                queue_rc = main(["--db", db_path, "queue", "list"])
+            self.assertEqual(queue_rc, 0)
+            self.assertIn("[candidate]", queue_out.getvalue())
+
+    def test_seed_missing_fixture_path_prints_friendly_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = str(Path(tmp) / "mpi.db")
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                rc = main(["--db", db_path, "seed", "--from-fixtures", "missing-fixtures"])
+            self.assertEqual(rc, 2)
+            self.assertIn("file not found", err.getvalue())
+
+    def test_missing_database_parent_prints_friendly_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = str(Path(tmp) / "missing-parent" / "mpi.db")
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                rc = main(["--db", db_path, "search", "--keyword", "Atlas"])
+            self.assertEqual(rc, 2)
+            self.assertIn("database parent directory", err.getvalue())
 
 
 if __name__ == "__main__":
