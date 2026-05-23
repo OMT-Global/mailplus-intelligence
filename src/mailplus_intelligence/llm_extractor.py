@@ -8,6 +8,7 @@ Caches the shared system prompt and thread context using prompt caching.
 from __future__ import annotations
 
 import json
+import os
 import uuid
 from dataclasses import dataclass, field
 from typing import Any
@@ -30,6 +31,36 @@ _SYSTEM_PROMPT = (
 )
 
 _EXTRACTION_LANES_LLM = EXTRACTION_LANES
+DEFAULT_LLM_MODEL = "claude-opus-4-7"
+LLM_EXTRA_INSTALL_HINT = "pip install 'mailplus-intelligence[llm]'"
+
+
+class LLMNotAvailable(RuntimeError):
+    """Raised when LLM extraction is requested but cannot run locally."""
+
+
+def resolve_llm_model(model: str | None = None) -> str:
+    """Resolve the configured LLM model name."""
+
+    if model:
+        return model
+    return os.environ.get("MAILPLUS_LLM_MODEL") or DEFAULT_LLM_MODEL
+
+
+def _build_anthropic_client() -> Any:
+    try:
+        import anthropic
+    except ImportError as exc:
+        raise LLMNotAvailable(
+            f"Anthropic SDK is not installed; run {LLM_EXTRA_INSTALL_HINT} to enable LLM extraction."
+        ) from exc
+
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        raise LLMNotAvailable(
+            "ANTHROPIC_API_KEY is not set; set it or pass a cassette for offline LLM extraction."
+        )
+
+    return anthropic.Anthropic()
 
 
 @dataclass
@@ -116,7 +147,7 @@ def extract_with_llm(
     messages: list[dict[str, Any]],
     *,
     client: Any = None,
-    model: str = "claude-opus-4-7",
+    model: str | None = None,
     cassette: dict[str, str] | None = None,
     usage_stats: LLMUsageStats | None = None,
 ) -> LLMExtractionResult:
@@ -150,11 +181,10 @@ def extract_with_llm(
         return LLMExtractionResult(candidates=candidates, usage=stats, cassette_hit=True)
 
     if client is None:
-        import anthropic
-        client = anthropic.Anthropic()
+        client = _build_anthropic_client()
 
     response = client.messages.create(
-        model=model,
+        model=resolve_llm_model(model),
         max_tokens=1024,
         thinking={"type": "adaptive"},
         system=[
@@ -200,7 +230,7 @@ def extract_corpus_with_llm(
     messages: list[dict[str, Any]],
     *,
     client: Any = None,
-    model: str = "claude-opus-4-7",
+    model: str | None = None,
     cassette: dict[str, str] | None = None,
 ) -> LLMExtractionResult:
     """Run LLM extraction over all threads, sharing usage stats."""

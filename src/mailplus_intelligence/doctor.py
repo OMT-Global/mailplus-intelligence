@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .fixtures import load_metadata_fixture_corpus
+from .llm_extractor import resolve_llm_model
 from .runtime import default_runtime_profile
 from .schema import apply_schema_v0, current_schema_version
 from .sqlite import connect_sqlite
@@ -106,6 +107,25 @@ def run_fixture_doctor(project_root: str | Path = ".") -> DoctorReport:
             ),
         )
     )
+
+    try:
+        import anthropic  # noqa: F401
+
+        sdk_available = True
+    except ImportError:
+        sdk_available = False
+
+    api_key_present = bool(os.environ.get("ANTHROPIC_API_KEY"))
+    if sdk_available and api_key_present:
+        llm_status = "ok"
+        llm_message = f"LLM extraction available; model={resolve_llm_model()}"
+    elif sdk_available:
+        llm_status = "gated"
+        llm_message = f"Anthropic SDK installed; ANTHROPIC_API_KEY missing; model={resolve_llm_model()}"
+    else:
+        llm_status = "gated"
+        llm_message = f"Anthropic SDK not installed; deterministic extraction only; model={resolve_llm_model()}"
+    checks.append(DoctorCheck("llm", llm_status, llm_message))
 
     return DoctorReport(tuple(checks))
 
