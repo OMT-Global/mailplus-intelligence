@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import stat
 import tempfile
 import unittest
 from pathlib import Path
@@ -37,6 +38,16 @@ class RuntimeBaselineTests(unittest.TestCase):
                     ("m0@example.test",),
                 ).fetchone()
                 self.assertEqual(row["subject"], "M0 runtime baseline")
+            finally:
+                connection.close()
+
+    def test_sqlite_file_is_owner_only_when_created(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            database = Path(tmpdir) / "mailplus-intelligence.db"
+            connection = connect_sqlite(database)
+            try:
+                mode = stat.S_IMODE(database.stat().st_mode)
+                self.assertEqual(mode, 0o600)
             finally:
                 connection.close()
 
