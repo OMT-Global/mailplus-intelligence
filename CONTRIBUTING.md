@@ -34,3 +34,10 @@ people, accounts, hosts, messages, or credentials.
 
 Review `docs/privacy-redaction-boundaries.md` before adding data fixtures,
 semantic outputs, logs, or documentation examples.
+
+## Good First Issues
+
+Good newcomer tasks are tracked with the
+[`good first issue` label](https://github.com/OMT-Global/mailplus-intelligence/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
+Prefer fixture-mode changes, docs clarifications, or tests that do not require
+live MailPlus credentials.
