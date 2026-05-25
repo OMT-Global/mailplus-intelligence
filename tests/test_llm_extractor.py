@@ -8,9 +8,12 @@ import unittest
 from mailplus_intelligence.extractor import ExtractionCandidate
 from mailplus_intelligence.fixtures import load_metadata_fixture_corpus
 from mailplus_intelligence.llm_extractor import (
+    DEFAULT_LLM_MODEL,
+    LLMNotAvailable,
     LLMUsageStats,
     extract_corpus_with_llm,
     extract_with_llm,
+    resolve_llm_model,
 )
 from mailplus_intelligence.threading import reconstruct_fixture_threads
 
@@ -45,8 +48,12 @@ class LLMExtractorCassetteTests(unittest.TestCase):
         thread = next(t for t in self.threads if t.thread_id)
         # A non-matching cassette key forces a live API call, which fails without
         # credentials.  Verify the right error is raised rather than a silent pass.
-        with self.assertRaises((TypeError, Exception)):
+        with self.assertRaises(LLMNotAvailable) as raised:
             extract_with_llm(thread, self.messages, cassette={"other-thread": "[]"})
+        self.assertTrue(
+            "mailplus-intelligence[llm]" in str(raised.exception)
+            or "ANTHROPIC_API_KEY" in str(raised.exception)
+        )
 
     def test_corpus_cassette_aggregates_across_threads(self) -> None:
         cassette: dict[str, str] = {}
@@ -99,6 +106,23 @@ class LLMExtractorCassetteTests(unittest.TestCase):
         for thread in rft(messages):
             result = extract_with_llm(thread, messages, cassette={})
             self.assertEqual(result.candidates, [])
+
+    def test_model_resolution_prefers_argument_then_environment(self) -> None:
+        self.assertEqual(resolve_llm_model("claude-test"), "claude-test")
+
+        import os
+
+        old = os.environ.get("MAILPLUS_LLM_MODEL")
+        try:
+            os.environ["MAILPLUS_LLM_MODEL"] = "claude-env"
+            self.assertEqual(resolve_llm_model(), "claude-env")
+        finally:
+            if old is None:
+                os.environ.pop("MAILPLUS_LLM_MODEL", None)
+            else:
+                os.environ["MAILPLUS_LLM_MODEL"] = old
+
+        self.assertEqual(resolve_llm_model(), old or DEFAULT_LLM_MODEL)
 
 
 if __name__ == "__main__":
