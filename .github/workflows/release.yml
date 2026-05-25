@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  github-release:
+    name: Build GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build backend
+        run: python -m pip install --upgrade pip build
+
+      - name: Validate tag and build artifacts
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: bash scripts/release/dry-run.sh
+
+      - name: Extract changelog body
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python - <<'PY' > release-notes.md
+          from pathlib import Path
+          import os
+          import re
+          import sys
+
+          tag = os.environ["RELEASE_TAG"]
+          version = tag.removeprefix("v")
+          changelog = Path("CHANGELOG.md")
+          if not changelog.exists():
+              raise SystemExit("CHANGELOG.md is required for release notes")
+
+          text = changelog.read_text()
+          pattern = rf"^## \[{re.escape(version)}\][^\n]*\n(?P<body>.*?)(?=^## \[|\Z)"
+          match = re.search(pattern, text, flags=re.MULTILINE | re.DOTALL)
+          if not match:
+              raise SystemExit(f"CHANGELOG.md has no section for {version}")
+
+          body = match.group("body").strip()
+          if not body:
+              raise SystemExit(f"CHANGELOG.md section for {version} is empty")
+          sys.stdout.write(body + "\n")
+          PY
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            --title "$RELEASE_TAG" \
+            --notes-file release-notes.md \
+            dist/*.tar.gz dist/*.whl dist/SHA256SUMS
