@@ -115,6 +115,24 @@ Forbidden in the repo:
 - Production selected text caches or semantic output exports that have not passed promotion review.
 - Machine-local caches, logs, database files, or generated stores that may contain raw message content.
 
+## Local Secret Scan Guardrail
+
+`scripts/check-detect-secrets.sh` is a fast baseline guardrail for CI and local preflight checks. It is not comprehensive DLP and does not replace operator review before live MailPlus integration, selected-text-cache work, or public release.
+
+The default CI mode scans tracked files only:
+
+```bash
+bash scripts/check-detect-secrets.sh --all-files
+```
+
+Before staging or opening a PR that may have generated local artifacts, use the broader local mode:
+
+```bash
+bash scripts/check-detect-secrets.sh --all-files-with-untracked
+```
+
+The broader mode includes untracked, non-ignored files and checks for common local leak shapes, including `.eml` and `.mbox` mailbox exports, MailPlus metadata/cache database filenames, and live OAuth, reset, magic-login, recovery, checkout, invoice, billing, or payment links with token-like query parameters. Synthetic documentation and fixtures should use reserved domains such as `example.com` and redaction markers such as `[REDACTED_TOKEN]` so the scanner can distinguish examples from live artifacts.
+
 ## Fixture Redaction Rules
 
 Fixtures must be synthetic by default. If a real-world shape is needed to reproduce parsing behavior, reduce it to the minimum structure and redact before committing.

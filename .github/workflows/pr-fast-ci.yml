@@ -23,10 +23,11 @@ defaults:
 jobs:
   changes:
     name: Detect Relevant Changes
-    runs-on: ['self-hosted', 'synology', 'shell-only', 'private']
+    runs-on: ubuntu-latest
     outputs:
       app: ${{ steps.filter.outputs.app }}
       ci: ${{ steps.filter.outputs.ci }}
+      packaging: ${{ steps.filter.outputs.packaging }}
     steps:
       - uses: dorny/paths-filter@v3
         id: filter
@@ -60,10 +61,14 @@ jobs:
               - 'docs/bootstrap/**'
               - '.env.example'
               - 'CODEOWNERS'
+            packaging:
+              - 'pyproject.toml'
+              - '.github/workflows/release.yml'
+              - 'scripts/release/**'
 
   fast-checks:
     name: Fast Checks
-    runs-on: ['self-hosted', 'synology', 'shell-only', 'private']
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: changes
     if: >-
@@ -74,12 +79,16 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
       - name: Run fast checks
         run: bash scripts/ci/run-fast-checks.sh
 
   validate-secrets:
     name: Validate Secrets
-    runs-on: ['self-hosted', 'synology', 'shell-only', 'private']
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     if: github.event.pull_request.draft == false
     steps:
@@ -89,14 +98,38 @@ jobs:
       - name: Scan repository for secret patterns
         run: bash scripts/check-detect-secrets.sh --all-files
 
+  package-build:
+    name: Package Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: changes
+    if: >-
+      github.event.pull_request.draft == false &&
+      needs.changes.outputs.packaging == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install build backend
+        run: python -m pip install --upgrade pip build
+
+      - name: Build distribution artifacts
+        run: bash scripts/release/dry-run.sh --skip-fast-checks
+
   ci-gate:
     name: CI Gate
-    runs-on: ['self-hosted', 'synology', 'shell-only', 'private']
+    runs-on: ubuntu-latest
     if: always()
     needs:
       - changes
       - fast-checks
       - validate-secrets
+      - package-build
     steps:
       - name: Check required PR jobs
         env:
@@ -104,6 +137,7 @@ jobs:
             changes=${{ needs.changes.result }}
             fast-checks=${{ needs.fast-checks.result }}
             validate-secrets=${{ needs.validate-secrets.result }}
+            package-build=${{ needs.package-build.result }}
         run: |
           failed=0
           for entry in $RESULTS; do

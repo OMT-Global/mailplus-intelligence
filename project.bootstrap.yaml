@@ -21,8 +21,10 @@ repo:
     - .github/workflows/pr-fast-ci.yml
     - .github/workflows/extended-validation.yml
     - .github/workflows/claude.yml
+    - .github/workflows/release.yml
     - scripts/check-detect-secrets.sh
     - scripts/ci/**
+    - scripts/release/**
     - scripts/codex-cloud/**
     - scripts/claude-cloud/**
     - scripts/claude/**
@@ -109,8 +111,8 @@ capabilities:
     provider: cloudflare-pages
     outputDir: dist
   release:
-    enabled: false
-    kind: none
+    enabled: true
+    kind: github-release
   docsPublish:
     enabled: false
   containers:

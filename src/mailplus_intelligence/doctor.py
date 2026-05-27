@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .fixtures import load_metadata_fixture_corpus
+from .llm_extractor import resolve_llm_model
 from .runtime import default_runtime_profile
 from .schema import apply_schema_v0, current_schema_version
 from .sqlite import connect_sqlite
@@ -20,6 +21,7 @@ class DoctorCheck:
     name: str
     status: str
     message: str
+    next_step: str | None = None
 
 
 @dataclass(frozen=True)
@@ -45,6 +47,7 @@ def run_fixture_doctor(project_root: str | Path = ".") -> DoctorReport:
             "runtime",
             "ok" if sys.version_info >= (3, 12) else "fail",
             f"python {sys.version_info.major}.{sys.version_info.minor}; expected >=3.12",
+            None if sys.version_info >= (3, 12) else "Install Python 3.12 or newer.",
         )
     )
     checks.append(
@@ -52,6 +55,7 @@ def run_fixture_doctor(project_root: str | Path = ".") -> DoctorReport:
             "storage",
             "ok" if profile.storage_engine == "sqlite" else "fail",
             f"selected storage engine: {profile.storage_engine}",
+            None if profile.storage_engine == "sqlite" else "Use the default SQLite runtime profile.",
         )
     )
 
@@ -61,6 +65,7 @@ def run_fixture_doctor(project_root: str | Path = ".") -> DoctorReport:
             "manifest",
             "ok" if manifest.exists() else "fail",
             "project.bootstrap.yaml present" if manifest.exists() else "missing project.bootstrap.yaml",
+            None if manifest.exists() else "Run doctor from the repository root.",
         )
     )
 
@@ -75,7 +80,14 @@ def run_fixture_doctor(project_root: str | Path = ".") -> DoctorReport:
             )
         )
     except Exception as exc:
-        checks.append(DoctorCheck("fixtures", "fail", f"fixture corpus unavailable: {exc}"))
+        checks.append(
+            DoctorCheck(
+                "fixtures",
+                "fail",
+                f"fixture corpus unavailable: {exc}",
+                "Confirm fixtures/mailplus_metadata exists or restore the fixture corpus.",
+            )
+        )
 
     try:
         connection = connect_sqlite()
@@ -91,9 +103,16 @@ def run_fixture_doctor(project_root: str | Path = ".") -> DoctorReport:
         finally:
             connection.close()
     except Exception as exc:
-        checks.append(DoctorCheck("schema", "fail", f"schema bootstrap failed: {exc}"))
+        checks.append(
+            DoctorCheck(
+                "schema",
+                "fail",
+                f"schema bootstrap failed: {exc}",
+                "Check SQLite availability and repository migrations.",
+            )
+        )
 
-    live_keys = ("MAILPLUS_URL", "MAILPLUS_USERNAME", "MAILPLUS_PASSWORD")
+    live_keys = ("MAILPLUS_HOST", "MAILPLUS_USER", "MAILPLUS_TOKEN")
     missing_live_keys = [key for key in live_keys if not os.environ.get(key)]
     checks.append(
         DoctorCheck(
@@ -104,8 +123,32 @@ def run_fixture_doctor(project_root: str | Path = ".") -> DoctorReport:
                 if missing_live_keys
                 else "live MailPlus credential environment is present"
             ),
+            (
+                "Set MAILPLUS_HOST, MAILPLUS_USER, and MAILPLUS_TOKEN only when testing live access."
+                if missing_live_keys
+                else None
+            ),
         )
     )
+
+    try:
+        import anthropic  # noqa: F401
+
+        sdk_available = True
+    except ImportError:
+        sdk_available = False
+
+    api_key_present = bool(os.environ.get("ANTHROPIC_API_KEY"))
+    if sdk_available and api_key_present:
+        llm_status = "ok"
+        llm_message = f"LLM extraction available; model={resolve_llm_model()}"
+    elif sdk_available:
+        llm_status = "gated"
+        llm_message = f"Anthropic SDK installed; ANTHROPIC_API_KEY missing; model={resolve_llm_model()}"
+    else:
+        llm_status = "gated"
+        llm_message = f"Anthropic SDK not installed; deterministic extraction only; model={resolve_llm_model()}"
+    checks.append(DoctorCheck("llm", llm_status, llm_message))
 
     return DoctorReport(tuple(checks))
 
@@ -116,6 +159,8 @@ def format_doctor_report(report: DoctorReport) -> str:
     lines = ["MailPlus Intelligence fixture doctor"]
     for check in report.checks:
         lines.append(f"- {check.status}: {check.name}: {check.message}")
+        if check.next_step:
+            lines.append(f"  next: {check.next_step}")
     lines.append(f"result: {'ok' if report.ok else 'failed'}")
     return "\n".join(lines)
 

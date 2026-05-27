@@ -16,12 +16,14 @@ class FixtureDoctorTests(unittest.TestCase):
         self.assertEqual(statuses["fixtures"], "ok")
         self.assertEqual(statuses["schema"], "ok")
         self.assertEqual(statuses["live-mailplus"], "gated")
+        self.assertIn(statuses["llm"], {"ok", "gated"})
         self.assertTrue(report.ok)
 
     def test_fixture_doctor_output_names_gated_live_access(self) -> None:
         output = format_doctor_report(run_fixture_doctor())
 
         self.assertIn("live MailPlus credentials intentionally unavailable", output)
+        self.assertIn("llm", output)
         self.assertIn("result: ok", output)
 
 
