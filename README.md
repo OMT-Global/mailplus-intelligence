@@ -70,6 +70,25 @@ Those distilled outputs can then feed:
 - future entity/concept pages
 - reminders/tasks when explicitly approved
 
+## What's in v0.1
+
+### Working end-to-end
+
+v0.1 is a fixture-mode release. It supports metadata fixture sync, SQLite
+schema bootstrap, deterministic thread reconstruction, lane classification,
+noise suppression, deterministic semantic extraction, LLM extraction when the
+optional `llm` extra and API key are configured, promotion queue review,
+dry-run exporters, scheduler locks, CLI inspection, and `mpi doctor`.
+
+### Stubbed / not-yet-wired
+
+- Live MailPlus/IMAP ingestion is not connected yet. The public adapter shape
+  is documented in [the live MailPlus adapter guide](docs/integration/live-mailplus-adapter.md)
+  and tracked for Phase 2 in [issue #75](https://github.com/OMT-Global/mailplus-intelligence/issues/75).
+- Production export to wiki, `memory/`, or reminders is dry-run only. The
+  future live export contract is documented in [the live export guide](docs/integration/live-export.md)
+  and tracked for Phase 2 in [issue #75](https://github.com/OMT-Global/mailplus-intelligence/issues/75).
+
 ## What should not go into memory
 
 Avoid dumping:
@@ -129,7 +148,10 @@ Phase 1 should support practical operator questions like:
 
 ## Roadmap status
 
-The current roadmap is tracked in GitHub issues for this repository.
+The v0.1 public-release blockers are tracked with the
+[`release-v0.1` label](https://github.com/OMT-Global/mailplus-intelligence/issues?q=is%3Aissue+is%3Aopen+label%3Arelease-v0.1).
+Phase 2 live integration work is tracked in
+[issue #75](https://github.com/OMT-Global/mailplus-intelligence/issues/75).
 
 Primary epics include:
 
@@ -141,6 +163,9 @@ Primary epics include:
 - semantic extraction
 - memory/wiki promotion
 - phase-1 medium-architecture delivery
+
+Release history is tracked in [CHANGELOG.md](CHANGELOG.md), and versioning
+policy is documented in [docs/versioning.md](docs/versioning.md).
 
 ## Agent execution
 

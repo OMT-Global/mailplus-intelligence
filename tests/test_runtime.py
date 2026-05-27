@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from mailplus_intelligence import connect_sqlite, default_runtime_profile
+from mailplus_intelligence import __version__, connect_sqlite, default_runtime_profile
 
 
 class RuntimeBaselineTests(unittest.TestCase):
@@ -16,6 +16,10 @@ class RuntimeBaselineTests(unittest.TestCase):
         self.assertEqual(profile.python_version, "3.12")
         self.assertEqual(profile.storage_engine, "sqlite")
         self.assertFalse(profile.live_mailplus_access)
+
+    def test_package_version_is_exposed(self) -> None:
+        self.assertIsInstance(__version__, str)
+        self.assertGreater(len(__version__), 0)
 
     def test_sqlite_connection_supports_index_style_round_trip(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
