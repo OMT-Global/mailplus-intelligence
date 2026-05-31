@@ -15,7 +15,11 @@ defaults:
 jobs:
   github-release:
     name: Build GitHub Release
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - linux
+      - shell-only
+      - public
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
