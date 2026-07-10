@@ -50,7 +50,7 @@ mpi --db ./mpi.db seed --from-fixtures fixtures/mailplus_metadata
 Expected shape:
 
 ```text
-Seeded fixture corpus: inserted=8, skipped=0, queued=4, queue_skipped=0.
+Seeded fixture corpus: inserted=8, updated=0, unchanged=0, rejected=0, failed=0, queued=4, queue_skipped=0.
 ```
 
 Re-running the command is safe; indexed messages and deterministic queue items
