@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mailplus-intelligence"
-version = "0.1.0"
+version = "0.1.1"
 description = "Python foundations for MailPlus-derived intelligence workflows."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -24,3 +24,6 @@ mpi = "mailplus_intelligence.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+mailplus_intelligence = ["migrations/*.sql"]

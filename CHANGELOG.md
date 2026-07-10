@@ -7,10 +7,37 @@ policy in [docs/versioning.md](docs/versioning.md).
 
 ## [Unreleased]
 
-- Prepare public-release polish, release workflow, and repo metadata before the
-  v0.1.0 visibility/tagging gate.
+- Publication of the prepared v0.1.1 patch remains gated on the other Phase A
+  release blockers tracked by issue #98.
+
+## [0.1.1] - 2026-07-10 (proposed)
+
+### Fixed
+
+- Package all three SQL migrations in wheels and source distributions so a
+  clean installation can initialize an empty SQLite database.
+- Load migrations through installed-package resources instead of assuming a
+  filesystem-relative source checkout.
+
+### Changed
+
+- Release validation now checks wheel and source-distribution contents, rebuilds
+  a wheel from the source distribution, and exercises the installed `mpi` CLI
+  through migration, fixture seed, search, queue inspection, and dry-run export.
+
+### Release status
+
+- The proposed release tag is `v0.1.1`. It has not been published and remains
+  blocked on the other Phase A issues linked from #98.
+- This patch supersedes the unusable `v0.1.0` artifact history without moving or
+  deleting the public `v0.1.0` tag.
 
 ## [0.1.0] - 2026-05-23
+
+> **Known release limitation:** the public `v0.1.0` tag points to a
+> documentation-only commit that predates `pyproject.toml` and the `src/`
+> package. It is not an installable software release. The tag is retained
+> unchanged as public history; use `v0.1.1` once that patch is published.
 
 ### Added
 
