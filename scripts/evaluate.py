@@ -14,30 +14,70 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
 
-def _load_classification_fixtures(fixtures_dir: Path) -> tuple[list[dict], list[dict]]:
+class FixtureCorpusError(ValueError):
+    """Raised when a required evaluation corpus is absent or malformed."""
+
+
+def _load_collection(path: Path, key: str, id_key: str, label: str) -> list[dict[str, Any]]:
+    if not path.is_file():
+        raise FixtureCorpusError(f"Required {label} fixture corpus is missing: {path}")
+
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise FixtureCorpusError(f"Could not load {label} fixture corpus {path}: {exc}") from exc
+
+    collection = payload.get(key) if isinstance(payload, dict) else None
+    if not isinstance(collection, list) or not collection:
+        raise FixtureCorpusError(
+            f"Required {label} fixture collection '{key}' is missing or empty: {path}"
+        )
+    if not all(isinstance(item, dict) for item in collection):
+        raise FixtureCorpusError(f"Every {label} fixture must be an object: {path}")
+
+    identifiers = [str(item.get(id_key, "")).strip() for item in collection]
+    if any(not identifier for identifier in identifiers):
+        raise FixtureCorpusError(f"Every {label} fixture must define a stable '{id_key}'")
+    duplicates = sorted(identifier for identifier, count in Counter(identifiers).items() if count > 1)
+    if duplicates:
+        raise FixtureCorpusError(
+            f"Duplicate {label} fixture identifiers for '{id_key}': {', '.join(duplicates)}"
+        )
+    return collection
+
+
+def _load_classification_fixtures(fixtures_dir: Path) -> list[dict[str, Any]]:
     cases_path = fixtures_dir / "classification" / "cases.json"
-    if not cases_path.exists():
-        return [], []
-    payload = json.loads(cases_path.read_text(encoding="utf-8"))
-    return payload.get("cases", []), payload.get("expected", [])
+    return _load_collection(cases_path, "cases", "id", "classification")
 
 
 def _load_semantic_fixtures(fixtures_dir: Path) -> list[dict]:
     sem_dir = fixtures_dir / "semantic"
-    if not sem_dir.exists():
-        return []
-    artifacts = []
-    for path in sorted(sem_dir.glob("*.json")):
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if isinstance(data, list):
-            artifacts.extend(data)
-        else:
-            artifacts.append(data)
+    paths = sorted(sem_dir.glob("*.json")) if sem_dir.is_dir() else []
+    if not paths:
+        raise FixtureCorpusError(f"Required semantic fixture corpus is missing: {sem_dir}")
+
+    artifacts: list[dict[str, Any]] = []
+    for path in paths:
+        artifacts.extend(_load_collection(path, "artifacts", "artifact_id", "semantic"))
+
+    identifiers = [str(artifact["artifact_id"]) for artifact in artifacts]
+    duplicates = sorted(identifier for identifier, count in Counter(identifiers).items() if count > 1)
+    if duplicates:
+        raise FixtureCorpusError(
+            f"Duplicate semantic artifact identifiers across fixture files: {', '.join(duplicates)}"
+        )
     return artifacts
+
+
+def _load_noise_suppression_fixtures(fixtures_dir: Path) -> list[dict[str, Any]]:
+    path = fixtures_dir / "noise_suppression" / "messages.json"
+    return _load_collection(path, "messages", "fixture_id", "noise-suppression")
 
 
 def evaluate_classification(cases: list[dict[str, Any]]) -> list[dict]:
@@ -46,12 +86,12 @@ def evaluate_classification(cases: list[dict[str, Any]]) -> list[dict]:
     results = []
     for case in cases:
         subject = case.get("subject", "")
-        sender = case.get("sender", "")
-        expected_lane = case.get("expected_lane", "")
+        sender = case.get("from", "")
+        expected_lane = case.get("lane", "")
         result = classify_metadata(subject, sender)
         passed = result.lane == expected_lane
         results.append({
-            "case_id": case.get("case_id", "?"),
+            "case_id": case.get("id", "?"),
             "subject": subject,
             "sender": sender,
             "expected": expected_lane,
@@ -98,24 +138,59 @@ def evaluate_noise_suppression(messages: list[dict[str, Any]]) -> list[dict]:
 
 
 def run_evaluation(fixtures_dir: Path) -> dict:
-    classification_cases, _ = _load_classification_fixtures(fixtures_dir)
-    semantic_artifacts = _load_semantic_fixtures(fixtures_dir)
+    if not fixtures_dir.is_dir():
+        raise FixtureCorpusError(f"Fixtures directory not found: {fixtures_dir}")
 
-    meta_messages_path = fixtures_dir / "mailplus_metadata" / "messages.json"
-    meta_messages: list[dict] = []
-    if meta_messages_path.exists():
-        payload = json.loads(meta_messages_path.read_text(encoding="utf-8"))
-        meta_messages = list(payload.get("messages", []))
+    classification_cases = _load_classification_fixtures(fixtures_dir)
+    semantic_artifacts = _load_semantic_fixtures(fixtures_dir)
+    suppression_messages = _load_noise_suppression_fixtures(fixtures_dir)
 
     classification_results = evaluate_classification(classification_cases)
     semantic_results = evaluate_semantic_contract(semantic_artifacts)
-    suppression_results = evaluate_noise_suppression(meta_messages)
+    suppression_results = evaluate_noise_suppression(suppression_messages)
 
-    def _summary(results: list[dict]) -> dict:
+    def _summary(results: list[dict], group_field: str, group_name: str) -> dict:
         total = len(results)
         passed = sum(1 for r in results if r.get("passed"))
         failed = total - passed
-        return {"total": total, "passed": passed, "failed": failed}
+        groups: dict[str, dict[str, int]] = {}
+        for result in results:
+            group = str(result.get(group_field, "unknown"))
+            counts = groups.setdefault(group, {"total": 0, "passed": 0, "failed": 0})
+            counts["total"] += 1
+            if result.get("passed"):
+                counts["passed"] += 1
+            else:
+                counts["failed"] += 1
+        return {"total": total, "passed": passed, "failed": failed, group_name: groups}
+
+    classification_summary = _summary(classification_results, "expected", "by_lane")
+    classification_summary.update({
+        "false_promotions": sum(
+            1
+            for result in classification_results
+            if result["expected"] == "ignore_noise" and result["actual"] != "ignore_noise"
+        ),
+        "false_suppressions": sum(
+            1
+            for result in classification_results
+            if result["expected"] != "ignore_noise" and result["actual"] == "ignore_noise"
+        ),
+    })
+
+    suppression_summary = _summary(suppression_results, "expected", "by_action")
+    suppression_summary.update({
+        "false_promotions": sum(
+            1
+            for result in suppression_results
+            if result["expected"] == "suppress" and result["actual"] != "suppress"
+        ),
+        "false_suppressions": sum(
+            1
+            for result in suppression_results
+            if result["expected"] != "suppress" and result["actual"] == "suppress"
+        ),
+    })
 
     all_results = classification_results + semantic_results + suppression_results
     overall_passed = all(r.get("passed", True) for r in all_results)
@@ -123,15 +198,15 @@ def run_evaluation(fixtures_dir: Path) -> dict:
     return {
         "overall_passed": overall_passed,
         "classification": {
-            "summary": _summary(classification_results),
+            "summary": classification_summary,
             "cases": classification_results,
         },
         "semantic_contract": {
-            "summary": _summary(semantic_results),
+            "summary": _summary(semantic_results, "artifact_type", "by_artifact_type"),
             "cases": semantic_results,
         },
         "noise_suppression": {
-            "summary": _summary(suppression_results),
+            "summary": suppression_summary,
             "cases": suppression_results,
         },
     }
@@ -143,6 +218,12 @@ def _print_report(report: dict) -> None:
     for section in ("classification", "semantic_contract", "noise_suppression"):
         s = report[section]["summary"]
         print(f"  {section}: {s['passed']}/{s['total']} passed", end="")
+        if "false_promotions" in s:
+            print(
+                f"; false promotions={s['false_promotions']}; "
+                f"false suppressions={s['false_suppressions']}",
+                end="",
+            )
         if s["failed"]:
             print(f"  ← {s['failed']} FAILED")
             for case in report[section]["cases"]:
@@ -153,6 +234,12 @@ def _print_report(report: dict) -> None:
                     print(f"    FAIL [{cid}] expected={exp} actual={act}")
         else:
             print()
+        for group_name in ("by_lane", "by_artifact_type", "by_action"):
+            for group, counts in sorted(s.get(group_name, {}).items()):
+                print(
+                    f"    {group}: {counts['passed']}/{counts['total']} passed"
+                    f"; failed={counts['failed']}"
+                )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -166,7 +253,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Fixtures directory not found: {fixtures_dir}", file=sys.stderr)
         return 1
 
-    report = run_evaluation(fixtures_dir)
+    try:
+        report = run_evaluation(fixtures_dir)
+    except FixtureCorpusError as exc:
+        print(f"Evaluation fixture error: {exc}", file=sys.stderr)
+        return 1
 
     if args.report_json:
         Path(args.report_json).write_text(json.dumps(report, indent=2), encoding="utf-8")

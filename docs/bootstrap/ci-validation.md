@@ -26,11 +26,13 @@ Run locally with:
 bash scripts/ci/run-extended-validation.sh
 ```
 
-Extended validation runs the fast lane first, then adds fixture-oriented regression checks that can grow beyond the PR budget. It is wired for `main`, nightly, and manual workflow runs.
+Extended validation runs the fast lane first, then adds fixture-oriented regression checks that can grow beyond the PR budget. It is wired for `main`, nightly, and manual workflow runs. Changes to packaging, source, tests, fixtures, scripts, workflows, or documented contracts trigger this lane after merge to `main`.
 
 The extended lane currently checks:
 
 - Everything in fast validation.
-- Metadata fixture corpus regression coverage in `tests.test_metadata_fixtures`.
+- The complete classification, semantic-contract, and noise-suppression fixture evaluator.
+- Exact non-empty corpus counts, stable fixture identifiers, and overall pass state.
+- False-promotion and false-suppression counts in the printed and JSON evaluation report.
 
 Future fixture evaluation suites belong here unless they are cheap enough to run on every PR and remain shell-safe.
