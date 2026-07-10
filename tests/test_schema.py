@@ -16,7 +16,7 @@ class MetadataSchemaV0Tests(unittest.TestCase):
         connection = connect_sqlite()
         try:
             apply_all_migrations(connection)
-            self.assertEqual(current_schema_version(connection), 4)
+            self.assertEqual(current_schema_version(connection), 5)
         finally:
             connection.close()
 

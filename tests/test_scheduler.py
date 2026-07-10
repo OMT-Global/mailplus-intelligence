@@ -6,14 +6,18 @@ import time
 import unittest
 
 from mailplus_intelligence.scheduler import (
+    CACHE_DISPOSAL_JOB,
     LOCK_STALE_SECONDS,
     JobEvent,
     acquire_lock,
     get_job_status,
     list_jobs,
     release_lock,
+    run_cache_disposal_job,
     run_job,
 )
+from mailplus_intelligence.cache import cache_write
+from mailplus_intelligence.schema import apply_all_migrations
 from mailplus_intelligence.sqlite import connect_sqlite
 
 
@@ -107,6 +111,29 @@ class SchedulerLockTests(unittest.TestCase):
         event_types = {e.event for e in sink}
         self.assertIn("acquired", event_types)
         self.assertIn("released", event_types)
+
+    def test_cache_disposal_job_overwrites_expired_selected_text(self) -> None:
+        apply_all_migrations(self.conn)
+        cache_write(self.conn, "scheduled-expiry", "legal", "selected sentinel")
+        self.conn.execute(
+            "UPDATE text_cache SET expires_at = '2000-01-01T00:00:00+00:00' "
+            "WHERE locator_export_id = 'scheduled-expiry'"
+        )
+        self.conn.commit()
+
+        ran, disposed = run_cache_disposal_job(self.conn)
+
+        self.assertTrue(ran)
+        self.assertEqual(disposed, 1)
+        row = self.conn.execute(
+            "SELECT cached_text, disposed_at FROM text_cache "
+            "WHERE locator_export_id = 'scheduled-expiry'"
+        ).fetchone()
+        self.assertEqual(row["cached_text"], "")
+        self.assertTrue(row["disposed_at"])
+        status = get_job_status(self.conn, CACHE_DISPOSAL_JOB)
+        self.assertFalse(status.locked)
+        self.assertTrue(status.last_success_at)
 
 
 if __name__ == "__main__":

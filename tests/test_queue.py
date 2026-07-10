@@ -373,7 +373,7 @@ class LegacyQueueMigrationTests(unittest.TestCase):
 
             item = get_item(connection, "legacy-approved")
             history = get_review_history(connection, "legacy-approved")
-            self.assertEqual(current_schema_version(connection), 4)
+            self.assertEqual(current_schema_version(connection), 5)
             self.assertEqual(item.evidence_refs, ["subject", "fixture-export-legacy"])
             self.assertEqual(item.source_message_ids, [])
             self.assertEqual(item.provenance, "legacy")

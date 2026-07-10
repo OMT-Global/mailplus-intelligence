@@ -16,6 +16,7 @@ from typing import Any, Callable
 
 # Job lock TTL: a lock older than this is considered stale.
 LOCK_STALE_SECONDS = 300
+CACHE_DISPOSAL_JOB = "selected-text-cache-disposal"
 
 
 @dataclass(frozen=True)
@@ -200,3 +201,23 @@ def run_job(
     if event_sink is not None:
         event_sink.extend(release_events)
     return True, result
+
+
+def run_cache_disposal_job(
+    connection: sqlite3.Connection,
+    *,
+    holder: str = "local",
+    event_sink: list[JobEvent] | None = None,
+) -> tuple[bool, int | None]:
+    """Run the selected-text expiry/disposal sweep under the scheduler lock."""
+
+    from .cache import cache_evict_expired
+
+    ran, result = run_job(
+        connection,
+        CACHE_DISPOSAL_JOB,
+        lambda: cache_evict_expired(connection),
+        holder=holder,
+        event_sink=event_sink,
+    )
+    return ran, result
