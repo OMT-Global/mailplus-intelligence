@@ -183,10 +183,14 @@ All cache and queue operations emit audit events. Review with:
 
 ```bash
 sqlite3 mailplus.db "SELECT * FROM text_cache ORDER BY cached_at DESC LIMIT 20;"
-sqlite3 mailplus.db "SELECT artifact_id, review_status, decided_at FROM promotion_queue ORDER BY queued_at DESC LIMIT 20;"
+sqlite3 mailplus.db "SELECT artifact_id, review_status, revision, reviewer_identity, decided_at FROM promotion_queue ORDER BY queued_at DESC LIMIT 20;"
+sqlite3 mailplus.db "SELECT artifact_id, artifact_revision, prior_status, new_status, reviewer_identity, occurred_at FROM review_events ORDER BY occurred_at DESC LIMIT 20;"
+sqlite3 mailplus.db "SELECT artifact_id, artifact_revision, state, target_key, rollback_requested_at FROM export_outbox ORDER BY updated_at DESC LIMIT 20;"
 ```
 
-Audit events never contain raw message body content.
+Review events are append-only and never contain raw message body content.
+Legacy rows marked with `provenance='legacy'` remain auditable but are not
+export eligible because the pre-v4 schema discarded required provenance.
 
 ---
 

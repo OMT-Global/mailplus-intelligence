@@ -88,6 +88,11 @@ class EvaluationHarnessTests(unittest.TestCase):
             "summary": "Test summary",
             "confidence": "high",
             "review_status": "candidate",
+            "provenance": "deterministic",
+            "extractor_version": "metadata-extractor-v1",
+            "model_version": None,
+            "rule_version": "metadata-rules-v1",
+            "created_at": "2026-01-10T10:00:00Z",
         }
         results = evaluate_semantic_contract([artifact])
         self.assertEqual(len(results), 1)

@@ -105,7 +105,16 @@ mpi --db ./mpi.db queue inspect <artifact-id>
 Approve one artifact:
 
 ```bash
-mpi --db ./mpi.db queue approve <artifact-id> --notes "Looks correct from fixture metadata"
+mpi --db ./mpi.db queue approve <artifact-id> \
+  --reviewer operator@example.test --expected-revision 0 \
+  --notes "Looks correct from fixture metadata"
+```
+
+`queue inspect` prints the current revision. Reusing an older revision fails
+closed. Review immutable decision history with:
+
+```bash
+mpi --db ./mpi.db queue history <artifact-id>
 ```
 
 ## Dry-Run Export
@@ -120,9 +129,10 @@ Expected shape:
 
 ```text
 Dry-run export: 1 artifact(s) -> out
-  memory/thread-summaries/<artifact-id>.md
+  memory/thread-summaries/<artifact-id>-r1.md
 ```
 
 Production writes to wiki, `memory/`, and reminders are not enabled in v0.1.
 Review the generated files and `out/export-manifest.json` before any future live
-promotion work.
+promotion work. The manifest records the approved revision, review event,
+outbox ID, idempotency key, and rollback note.

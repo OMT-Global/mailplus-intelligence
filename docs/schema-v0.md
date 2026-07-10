@@ -12,6 +12,14 @@ Schema v0 uses SQLite as the interim structured recall store selected by the M0 
 - `attachments`: metadata only; no binary payloads.
 - `message_relationships`: `references` and `in-reply-to` edges.
 - `sync_checkpoints`: resumable fixture/export cursor state.
+- `promotion_queue`: immutable semantic envelope plus current review revision.
+- `review_events`: append-only reviewer decisions and corrections.
+- `export_outbox`: idempotent export identity, target state, and rollback state.
+
+Migration `004_semantic_provenance_review.sql` rebuilds the v3 queue without
+editing migration 003. Legacy evidence JSON is backfilled deterministically,
+legacy decisions receive one append-only event, and applying migrations again
+does not duplicate either record.
 
 ## Index Plan
 
