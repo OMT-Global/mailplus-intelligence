@@ -8,6 +8,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .fixtures import load_metadata_fixture_corpus
+from .live_adapter import (
+    LIVE_OPTIONAL_ENV_VARS,
+    LIVE_REQUIRED_ENV_VARS,
+    LiveAdapterNotConfigured,
+    load_live_config,
+)
 from .llm_extractor import resolve_llm_model
 from .runtime import default_runtime_profile
 from .schema import apply_schema_v0, current_schema_version
@@ -112,21 +118,81 @@ def run_fixture_doctor(project_root: str | Path = ".") -> DoctorReport:
             )
         )
 
-    live_keys = ("MAILPLUS_HOST", "MAILPLUS_USER", "MAILPLUS_TOKEN")
-    missing_live_keys = [key for key in live_keys if not os.environ.get(key)]
+    missing_live_keys = [
+        key
+        for key in LIVE_REQUIRED_ENV_VARS
+        if not (os.environ.get(key) or "").strip()
+    ]
+    any_live_configuration = any(
+        key in os.environ for key in (*LIVE_REQUIRED_ENV_VARS, *LIVE_OPTIONAL_ENV_VARS)
+    )
+    live_configuration_error: str | None = None
+    if not missing_live_keys:
+        try:
+            load_live_config()
+        except LiveAdapterNotConfigured as exc:
+            live_configuration_error = str(exc)
+    live_configured = not missing_live_keys and live_configuration_error is None
+    live_configuration_status = (
+        "ok" if live_configured else "fail" if any_live_configuration else "gated"
+    )
     checks.append(
         DoctorCheck(
-            "live-mailplus",
-            "gated" if missing_live_keys else "ok",
+            "live-configured",
+            live_configuration_status,
             (
-                "live MailPlus credentials intentionally unavailable in fixture mode"
-                if missing_live_keys
-                else "live MailPlus credential environment is present"
+                "required live process environment variables are present and locally parseable"
+                if live_configured
+                else (
+                    f"missing required variables: {', '.join(missing_live_keys)}"
+                    if missing_live_keys
+                    else live_configuration_error or "live configuration is invalid"
+                )
             ),
             (
-                "Set MAILPLUS_HOST, MAILPLUS_USER, and MAILPLUS_TOKEN only when testing live access."
-                if missing_live_keys
-                else None
+                None
+                if live_configured
+                else (
+                    "Export MAILPLUS_HOST, MAILPLUS_USER, and MAILPLUS_TOKEN in "
+                    "the invoking process; files are not loaded automatically."
+                    if missing_live_keys
+                    else "Correct the named environment setting before retrying."
+                )
+            ),
+        )
+    )
+
+    capability_reason = (
+        "not checked; the live network transport is not implemented"
+        if live_configured
+        else (
+            "not checked because live configuration is invalid or incomplete"
+            if any_live_configuration
+            else "not checked because live configuration is absent"
+        )
+    )
+    checks.extend(
+        (
+            DoctorCheck(
+                "live-reachable",
+                "gated",
+                capability_reason,
+                "Use fixture mode until a credential-gated reachability probe is implemented.",
+            ),
+            DoctorCheck(
+                "live-authenticated",
+                "gated",
+                capability_reason,
+                (
+                    "Do not infer authentication from variable presence; use a "
+                    "future explicit live probe."
+                ),
+            ),
+            DoctorCheck(
+                "live-sync-capable",
+                "gated",
+                "not available; the live adapter currently returns a stub batch",
+                "Use fixture seed and search workflows until read-only live sync is implemented.",
             ),
         )
     )
@@ -142,13 +208,26 @@ def run_fixture_doctor(project_root: str | Path = ".") -> DoctorReport:
     if sdk_available and api_key_present:
         llm_status = "ok"
         llm_message = f"LLM extraction available; model={resolve_llm_model()}"
+        llm_next_step = None
     elif sdk_available:
         llm_status = "gated"
-        llm_message = f"Anthropic SDK installed; ANTHROPIC_API_KEY missing; model={resolve_llm_model()}"
+        llm_message = (
+            "Anthropic SDK installed; ANTHROPIC_API_KEY missing; "
+            f"model={resolve_llm_model()}"
+        )
+        llm_next_step = (
+            "Export ANTHROPIC_API_KEY only for an approved live LLM extraction run."
+        )
     else:
         llm_status = "gated"
-        llm_message = f"Anthropic SDK not installed; deterministic extraction only; model={resolve_llm_model()}"
-    checks.append(DoctorCheck("llm", llm_status, llm_message))
+        llm_message = (
+            "Anthropic SDK not installed; deterministic extraction only; "
+            f"model={resolve_llm_model()}"
+        )
+        llm_next_step = (
+            "Install the llm extra only when optional live LLM extraction is approved."
+        )
+    checks.append(DoctorCheck("llm", llm_status, llm_message, llm_next_step))
 
     return DoctorReport(tuple(checks))
 

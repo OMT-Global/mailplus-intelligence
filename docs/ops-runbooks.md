@@ -9,13 +9,14 @@ All live MailPlus/DSM work is **credential-gated** — do not proceed past the m
 
 Verify the environment is healthy before any sync work.
 
-```bash
+```bash fixture-smoke
 python -m mailplus_intelligence.doctor
 # or via the CLI:
 mpi doctor --project-root .
 ```
 
-Expected output: all checks `ok` except `live-mailplus` which shows `gated`.
+Expected output: fixture checks are `ok`; live configuration, reachability,
+authentication, and sync capability are reported separately and remain `gated`.
 
 **Stop condition:** if `runtime`, `storage`, `manifest`, `fixtures`, or `schema` checks report `fail`, resolve before continuing.
 
@@ -25,7 +26,7 @@ Expected output: all checks `ok` except `live-mailplus` which shows `gated`.
 
 Run an offline incremental sync against the fixture corpus.
 
-```bash
+```bash fixture-smoke
 # Apply schema and ingest fixture messages into a local database
 python - <<'EOF'
 from mailplus_intelligence.sqlite import connect_sqlite
@@ -42,6 +43,9 @@ write_result = write_index_records(conn, result.records)
 print(f"Inserted: {write_result.inserted}  Skipped: {write_result.skipped}  Errors: {write_result.errors}")
 conn.close()
 EOF
+
+# Exercise the supported CLI path and create its fixture checkpoint and queue.
+mpi seed --db mailplus.db --from-fixtures fixtures/mailplus_metadata
 ```
 
 Idempotent: re-running skips already-indexed messages (matched by `locator_export_id`).
@@ -54,10 +58,12 @@ Idempotent: re-running skips already-indexed messages (matched by `locator_expor
 
 | Mode | When to use | Behavior |
 |------|-------------|----------|
-| Full backfill | First run or after schema migration | Processes all messages from the beginning |
-| Incremental | Recurring runs | Processes only messages since last checkpoint cursor |
+| Fixture replay | Local setup or regression testing | Replays the synthetic corpus idempotently from the beginning |
+| Live incremental | Future recurring runs | `contract-only`; no live transport currently consumes a checkpoint cursor |
 
-To force a backfill, clear or reset the checkpoint:
+The following SQL is a manual recovery operation, not part of the executable
+fixture smoke. Back up the database and obtain operator approval before clearing
+a checkpoint:
 
 ```sql
 DELETE FROM sync_checkpoints WHERE source_name = 'your-source';
@@ -67,18 +73,18 @@ DELETE FROM sync_checkpoints WHERE source_name = 'your-source';
 
 ## 4. Checkpoint resume and replay
 
-If a sync run is interrupted:
+Fixture mode records a checkpoint for inspection but replays the bounded corpus
+from the beginning. A real cursor-resuming live loop is not implemented. If a
+fixture run is interrupted:
 
 1. The `sync_checkpoints` row retains the last successful cursor.
-2. Re-run the sync job — it will resume from that cursor.
-3. Idempotent writes mean partial progress is safe to replay.
+2. Re-run the documented `mpi seed` command.
+3. Idempotent writes make the bounded fixture corpus safe to replay.
 
 To inspect checkpoint state:
 
-```bash
-mpi doctor
-# or query directly:
-sqlite3 mailplus.db "SELECT * FROM sync_checkpoints;"
+```bash fixture-smoke
+mpi sync checkpoint --db mailplus.db --source fixture-corpus
 ```
 
 ---
@@ -89,15 +95,21 @@ sqlite3 mailplus.db "SELECT * FROM sync_checkpoints;"
 
 Required environment variables (never commit to repo):
 
-```bash
-export MAILPLUS_URL=https://your-nas/mail
-export MAILPLUS_USERNAME=your-username
-export MAILPLUS_PASSWORD=your-password
+```bash live-manual
+export MAILPLUS_HOST=imap.example.invalid
+export MAILPLUS_USER=operator@example.invalid
+read -r -s -p "MailPlus token: " MAILPLUS_TOKEN
+export MAILPLUS_TOKEN
 ```
 
-Once credentials are set, the doctor check `live-mailplus` will report `ok` instead of `gated`.
+The runtime reads only the invoking process environment; it does not load
+configuration files automatically. Once the variables are present,
+`live-configured` reports `ok`. Reachability, authentication, and sync capability
+remain `gated` until a real read-only transport and explicit probes exist.
 
-The live adapter (`src/mailplus_intelligence/live_adapter.py`, to be implemented per issue #71) must pass the same interface contracts as the fixture backend before being enabled.
+The live adapter (`src/mailplus_intelligence/live_adapter.py`, planned in issue
+#106) must pass the same interface contracts as the fixture backend before being
+enabled.
 
 ---
 
@@ -105,7 +117,7 @@ The live adapter (`src/mailplus_intelligence/live_adapter.py`, to be implemented
 
 Run classification and semantic extraction against indexed messages.
 
-```bash
+```bash fixture-smoke
 # Classify all fixture messages
 python - <<'EOF'
 from mailplus_intelligence.fixtures import load_metadata_fixture_corpus
@@ -124,7 +136,12 @@ EOF
 
 Inspect and act on pending extraction candidates.
 
-```bash
+```bash fixture-smoke
+read -r APPROVE_ID REJECT_ID DEFER_ID CORRECT_ID <<< "$(
+  mpi queue list --db mailplus.db --json |
+    python -c 'import json, sys; print(*(item["artifact_id"] for item in json.load(sys.stdin)[:4]))'
+)"
+
 # List all candidates
 mpi queue list --db mailplus.db
 
@@ -132,19 +149,19 @@ mpi queue list --db mailplus.db
 mpi queue list --db mailplus.db --status candidate
 
 # Inspect a specific artifact
-mpi queue inspect <artifact-id> --db mailplus.db
+mpi queue inspect "$APPROVE_ID" --db mailplus.db
 
 # Approve a candidate
-mpi queue approve <artifact-id> --db mailplus.db --notes "Reviewed and confirmed"
+mpi queue approve "$APPROVE_ID" --db mailplus.db --notes "Reviewed and confirmed"
 
 # Reject a candidate
-mpi queue reject <artifact-id> --db mailplus.db --notes "False positive — automated notice"
+mpi queue reject "$REJECT_ID" --db mailplus.db --notes "False positive — automated notice"
 
 # Defer for later review
-mpi queue defer <artifact-id> --db mailplus.db
+mpi queue defer "$DEFER_ID" --db mailplus.db
 
 # Apply a correction
-mpi queue correct <artifact-id> --corrected-summary "Corrected text here" --db mailplus.db
+mpi queue correct "$CORRECT_ID" --corrected-summary "Corrected text here" --db mailplus.db
 ```
 
 **Guardrail:** rejected and deferred candidates are never exported. Only `approved` and `corrected` items proceed to dry-run export.
@@ -155,7 +172,7 @@ mpi queue correct <artifact-id> --corrected-summary "Corrected text here" --db m
 
 Generate inspectable artifacts from approved candidates without modifying production surfaces.
 
-```bash
+```bash fixture-smoke
 mpi export --db mailplus.db --output ./export-artifacts
 ```
 
@@ -177,16 +194,28 @@ Review the generated files in `./export-artifacts/` before any live promotion. T
 
 ---
 
-## 10. Audit log review
+## 10. Review-state inspection
 
-All cache and queue operations emit audit events. Review with:
+Fixture mode stores queue decisions in `promotion_queue`. Inspect only the
+privacy-safe review fields; do not print selected cached text or credential
+values:
 
-```bash
-sqlite3 mailplus.db "SELECT * FROM text_cache ORDER BY cached_at DESC LIMIT 20;"
-sqlite3 mailplus.db "SELECT artifact_id, review_status, decided_at FROM promotion_queue ORDER BY queued_at DESC LIMIT 20;"
+```bash fixture-smoke
+python - <<'EOF'
+import sqlite3
+
+connection = sqlite3.connect("mailplus.db")
+for row in connection.execute(
+    "SELECT artifact_id, review_status, decided_at "
+    "FROM promotion_queue ORDER BY queued_at DESC LIMIT 20"
+):
+    print(row)
+connection.close()
+EOF
 ```
 
-Audit events never contain raw message body content.
+This query returns artifact IDs, state, and timestamps only. Dedicated
+append-only audit behavior is tracked separately from this fixture workflow.
 
 ---
 
@@ -194,9 +223,10 @@ Audit events never contain raw message body content.
 
 Run the offline evaluation harness before and after any extraction or classification change:
 
-```bash
-python scripts/evaluate.py --fixtures-dir fixtures --report-json /tmp/eval-report.json
-cat /tmp/eval-report.json
+```bash fixture-smoke
+python scripts/evaluate.py \
+  --fixtures-dir fixtures \
+  --report-json "${TMPDIR:-/tmp}/mailplus-eval-report.json"
 ```
 
 A baseline report should be committed alongside any change to classification heuristics, suppression rules, or semantic contract.

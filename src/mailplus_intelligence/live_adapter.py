@@ -1,7 +1,8 @@
-"""Live MailPlus adapter stub (#71).
+"""Contract-only live MailPlus adapter stub.
 
-Provides the same SyncBatch interface as the fixture path but reads from a
-real MailPlus account via environment-configured credentials.
+Provides the same ``SyncBatch`` interface as the fixture path. The network
+transport is intentionally unimplemented; configuration alone never proves
+reachability, authentication, or sync capability.
 
 GATE: This module requires MAILPLUS_HOST, MAILPLUS_USER, and MAILPLUS_TOKEN to
 be set in the environment.  It raises ``LiveAdapterNotConfigured`` if any are
@@ -15,6 +16,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from .sync import SyncBatch
+
+
+LIVE_REQUIRED_ENV_VARS = ("MAILPLUS_HOST", "MAILPLUS_USER", "MAILPLUS_TOKEN")
+LIVE_OPTIONAL_ENV_VARS = ("MAILPLUS_MAILBOX", "MAILPLUS_PAGE_SIZE")
+MAX_MAILBOX_CHARS = 255
 
 
 class LiveAdapterNotConfigured(RuntimeError):
@@ -41,17 +47,45 @@ def load_live_config() -> LiveAdapterConfig:
         MAILPLUS_MAILBOX   (default INBOX)
         MAILPLUS_PAGE_SIZE (default 50)
     """
-    missing = [v for v in ("MAILPLUS_HOST", "MAILPLUS_USER", "MAILPLUS_TOKEN") if not os.getenv(v)]
+    missing = [
+        name
+        for name in LIVE_REQUIRED_ENV_VARS
+        if not (os.getenv(name) or "").strip()
+    ]
     if missing:
         raise LiveAdapterNotConfigured(
-            f"Live adapter requires environment variables: {', '.join(missing)}"
+            "Live adapter is not configured. Export these process environment "
+            f"variables before retrying: {', '.join(missing)}. "
+            "Configuration files are not loaded automatically."
         )
+
+    page_size_value = os.getenv("MAILPLUS_PAGE_SIZE", "50").strip()
+    try:
+        page_size = int(page_size_value)
+    except ValueError as exc:
+        raise LiveAdapterNotConfigured(
+            "MAILPLUS_PAGE_SIZE must be an integer from 1 through 1000. "
+            "Export a bounded value before retrying."
+        ) from exc
+    if not 1 <= page_size <= 1000:
+        raise LiveAdapterNotConfigured(
+            "MAILPLUS_PAGE_SIZE must be from 1 through 1000. "
+            "Export a bounded value before retrying."
+        )
+
+    mailbox = os.getenv("MAILPLUS_MAILBOX", "INBOX").strip()
+    if not mailbox or len(mailbox) > MAX_MAILBOX_CHARS:
+        raise LiveAdapterNotConfigured(
+            f"MAILPLUS_MAILBOX must contain from 1 through {MAX_MAILBOX_CHARS} characters. "
+            "Export a bounded mailbox name before retrying."
+        )
+
     return LiveAdapterConfig(
-        host=os.environ["MAILPLUS_HOST"],
-        user=os.environ["MAILPLUS_USER"],
-        token=os.environ["MAILPLUS_TOKEN"],
-        mailbox=os.getenv("MAILPLUS_MAILBOX", "INBOX"),
-        page_size=int(os.getenv("MAILPLUS_PAGE_SIZE", "50")),
+        host=os.environ["MAILPLUS_HOST"].strip(),
+        user=os.environ["MAILPLUS_USER"].strip(),
+        token=os.environ["MAILPLUS_TOKEN"].strip(),
+        mailbox=mailbox,
+        page_size=page_size,
     )
 
 
