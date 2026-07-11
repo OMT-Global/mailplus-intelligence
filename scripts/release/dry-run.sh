@@ -49,7 +49,7 @@ BUILD_PYTHON="$RELEASE_TOOLS_DIR/bin/python"
 "$BUILD_PYTHON" -m pip install \
   --disable-pip-version-check \
   --no-cache-dir \
-  "build==1.5.1"
+  "build==1.5.0"
 echo "Using isolated release frontend: $("$BUILD_PYTHON" -m build --version)"
 
 "$PYTHON_BIN" - "$PACKAGE_VERSION" <<'PY'

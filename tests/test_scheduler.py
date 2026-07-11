@@ -9,10 +9,14 @@ from mailplus_intelligence.scheduler import (
     CACHE_DISPOSAL_JOB,
     LOCK_STALE_SECONDS,
     JobEvent,
+    SyncLease,
+    acquire_lease,
     acquire_lock,
     get_job_status,
     list_jobs,
     release_lock,
+    release_lease,
+    renew_lease,
     run_cache_disposal_job,
     run_job,
 )
@@ -49,6 +53,20 @@ class SchedulerLockTests(unittest.TestCase):
         acquired2, events2 = acquire_lock(self.conn, "test-job")
         self.assertFalse(acquired2)
         self.assertTrue(any(e.event == "skipped" for e in events2))
+
+    def test_lease_token_is_required_for_release_and_can_be_renewed(self) -> None:
+        lease, _ = acquire_lease(self.conn, "lease-job", holder="worker-a", ttl_seconds=60)
+        self.assertIsNotNone(lease)
+        assert lease is not None
+        renewed = renew_lease(self.conn, lease, ttl_seconds=60)
+        self.assertIsNotNone(renewed)
+        assert renewed is not None
+
+        impostor = SyncLease("lease-job", "worker-b", "wrong-token", renewed.expires_at)
+        self.assertFalse(release_lease(self.conn, impostor))
+        self.assertTrue(get_job_status(self.conn, "lease-job").locked)
+        self.assertTrue(release_lease(self.conn, renewed))
+        self.assertFalse(get_job_status(self.conn, "lease-job").locked)
 
     def test_stale_lock_cleared_on_acquire(self) -> None:
         from datetime import datetime, timedelta, timezone

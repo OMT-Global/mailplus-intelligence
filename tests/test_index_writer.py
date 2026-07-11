@@ -210,6 +210,32 @@ class IndexWriterTests(unittest.TestCase):
             self.assertIn("locator_export_id", r)
             self.assertIn("locator_uid", r)
 
+    def test_correspondent_search_hydrates_metadata_and_stable_cursor(self):
+        first = search_messages(self.conn, correspondent="alice@example.test", limit=1)
+        self.assertEqual(len(first), 1)
+        self.assertIn("participants", first[0])
+        self.assertIn("labels", first[0])
+        self.assertIn("flags", first[0])
+        self.assertIn("attachments", first[0])
+        second = search_messages(self.conn, correspondent="alice@example.test", cursor=first[0]["cursor"], limit=100)
+        self.assertTrue(all(row["locator_export_id"] != first[0]["locator_export_id"] for row in second))
+
+    def test_recipient_label_and_flag_filters_compose(self):
+        source = self.records[0]
+        result = search_messages(
+            self.conn,
+            recipient=source.recipients[0],
+            label=source.labels[0],
+            flag=source.flags[0],
+        )
+        self.assertGreater(len(result), 0)
+
+    def test_invalid_limit_and_cursor_fail_closed(self):
+        with self.assertRaisesRegex(ValueError, "limit"):
+            search_messages(self.conn, limit=0)
+        with self.assertRaisesRegex(ValueError, "cursor"):
+            search_messages(self.conn, cursor="not-a-cursor")
+
     def test_search_empty_returns_all(self):
         results = search_messages(self.conn, limit=100)
         self.assertGreater(len(results), 0)

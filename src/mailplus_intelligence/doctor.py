@@ -163,7 +163,7 @@ def run_fixture_doctor(project_root: str | Path = ".") -> DoctorReport:
     )
 
     capability_reason = (
-        "not checked; the live network transport is not implemented"
+        "not checked; run an explicit credential-gated IMAP sync to verify reachability"
         if live_configured
         else (
             "not checked because live configuration is invalid or incomplete"
@@ -177,22 +177,22 @@ def run_fixture_doctor(project_root: str | Path = ".") -> DoctorReport:
                 "live-reachable",
                 "gated",
                 capability_reason,
-                "Use fixture mode until a credential-gated reachability probe is implemented.",
+                "Use fixture mode or run mpi sync run with explicitly supplied credentials.",
             ),
             DoctorCheck(
                 "live-authenticated",
                 "gated",
                 capability_reason,
                 (
-                    "Do not infer authentication from variable presence; use a "
-                    "future explicit live probe."
+                    "Do not infer authentication from variable presence; use an "
+                    "explicit mpi sync run; doctor never attempts network authentication."
                 ),
             ),
             DoctorCheck(
                 "live-sync-capable",
                 "gated",
-                "not available; the live adapter currently returns a stub batch",
-                "Use fixture seed and search workflows until read-only live sync is implemented.",
+                "available through explicit read-only IMAP sync; doctor does not probe live systems",
+                "Run mpi sync run only when you intend to contact the configured mailbox.",
             ),
         )
     )

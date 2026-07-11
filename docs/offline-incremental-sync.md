@@ -57,6 +57,17 @@ rejected, or failed counts.
 
 ## Atomic Apply
 
+Every accepted metadata record passes through one shared ingest decision before
+the checkpoint advances: normalization, header-based thread reconstruction,
+suppression/classification, then persistence. The indexed `ingest_decisions`
+row is the source of truth for extraction eligibility; downstream extractors
+must not classify the same record again.
+
+Each observed locator is appended to `message_locator_history`. A move updates
+the indexed current mailbox metadata while preserving the prior locator variant
+for audit and review. Missing and deleted source states remain auditable rather
+than deleting indexed metadata implicitly.
+
 Normalized records are validated before mutation. Each record write uses a
 savepoint, so a child-row failure removes its parent and relationship rows. The
 batch's record mutations and checkpoint advancement then commit in one outer

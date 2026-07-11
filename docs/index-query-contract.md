@@ -16,6 +16,7 @@ The first contract should support:
 - label or flag
 - attachment presence
 - thread ID or thread key
+- opaque result cursor for stable pagination
 
 Inputs should be composable where practical, for example sender plus date range
 or folder plus attachment presence.
@@ -35,6 +36,16 @@ Each result should include:
 - locator fields or explicit missing-locator status
 
 Results must not include raw message bodies.
+
+## Pagination And History
+
+Results sort by descending sent timestamp and then locator export ID. The
+returned cursor is the exact pair required to continue after the final row;
+callers must reject malformed cursors rather than silently restarting a query.
+
+`mpi history <address-or-domain>` applies correspondent matching across sender,
+recipient, and CC roles, then presents the same metadata-only rows in
+chronological order with their thread key and locator.
 
 ## Error Cases
 

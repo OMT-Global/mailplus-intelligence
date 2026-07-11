@@ -37,6 +37,11 @@ def smoke_wheel(wheel: Path, project_root: Path, expected_version: str) -> None:
     project_root = project_root.resolve()
     if not wheel.is_file():
         raise SmokeFailure(f"wheel does not exist: {wheel}")
+    expected_schema_version = len(
+        tuple((project_root / "src" / "mailplus_intelligence" / "migrations").glob("*.sql"))
+    )
+    if expected_schema_version < 1:
+        raise SmokeFailure("source tree has no migration resources to validate")
 
     with tempfile.TemporaryDirectory(prefix="mailplus-wheel-smoke-") as temporary:
         work_dir = Path(temporary)
@@ -83,13 +88,14 @@ def smoke_wheel(wheel: Path, project_root: Path, expected_version: str) -> None:
                 version = current_schema_version(connection)
             finally:
                 connection.close()
-            if version != 4:
-                raise SystemExit(f"expected schema user_version=4, got {version}")
+            expected_version = int(sys.argv[2])
+            if version != expected_version:
+                raise SystemExit(f"expected schema user_version={expected_version}, got {version}")
             print(f"schema user_version={version}")
             """
         )
         _run(
-            [str(python), "-c", migration_program, str(database)],
+            [str(python), "-c", migration_program, str(database), str(expected_schema_version)],
             "empty database migration",
         )
 
@@ -177,7 +183,7 @@ def smoke_wheel(wheel: Path, project_root: Path, expected_version: str) -> None:
 
         print(
             f"installed-wheel smoke passed: {wheel.name}; "
-            f"schema=4, search={len(search_results)}, queue={len(queue_items)}, "
+            f"schema={expected_schema_version}, search={len(search_results)}, queue={len(queue_items)}, "
             f"exports={manifest['artifact_count']}"
         )
 
