@@ -53,7 +53,7 @@ mpi seed --db ./mpi.db --from-fixtures fixtures/mailplus_metadata
 Expected shape:
 
 ```text
-Seeded fixture corpus: inserted=8, skipped=0, queued=4, queue_skipped=0.
+Seeded fixture corpus: inserted=8, updated=0, unchanged=0, rejected=0, failed=0, queued=4, queue_skipped=0.
 ```
 
 Re-running the command is safe; indexed messages and deterministic queue items
@@ -116,7 +116,20 @@ ARTIFACT_ID="$(
   mpi queue list --db ./mpi.db --json |
     python -c 'import json, sys; print(json.load(sys.stdin)[0]["artifact_id"])'
 )"
-mpi queue approve "$ARTIFACT_ID" --db ./mpi.db --notes "Looks correct from fixture metadata"
+mpi queue approve "$ARTIFACT_ID" --db ./mpi.db \
+  --reviewer operator@example.test --expected-revision 0 \
+  --notes "Looks correct from fixture metadata"
+```
+
+`queue inspect` prints the current revision. Reusing an older revision fails
+closed. Review immutable decision history with:
+
+```bash fixture-smoke
+ARTIFACT_ID="$(
+  mpi queue list --db ./mpi.db --json |
+    python -c 'import json, sys; print(json.load(sys.stdin)[0]["artifact_id"])'
+)"
+mpi --db ./mpi.db queue history "$ARTIFACT_ID"
 ```
 
 ## Dry-Run Export
@@ -130,10 +143,11 @@ mpi export --db ./mpi.db --output ./out
 Expected shape:
 
 ```text
-Dry-run export: 1 artifact(s) → out
-  memory/thread-summaries/<artifact-id>.md
+Dry-run export: 1 artifact(s) -> out
+  memory/thread-summaries/<artifact-id>-r1.md
 ```
 
 Production writes to wiki, `memory/`, and reminders are not enabled in v0.1.
 Review the generated files and `out/export-manifest.json` before any future live
-promotion work.
+promotion work. The manifest records the approved revision, review event,
+outbox ID, idempotency key, and rollback note.

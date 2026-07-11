@@ -10,7 +10,8 @@ from __future__ import annotations
 import json
 import os
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
 from .classifier import ClassificationResult
@@ -33,6 +34,7 @@ _SYSTEM_PROMPT = (
 _EXTRACTION_LANES_LLM = EXTRACTION_LANES
 DEFAULT_LLM_MODEL = "claude-opus-4-7"
 LLM_EXTRA_INSTALL_HINT = "pip install 'mailplus-intelligence[llm]'"
+LLM_EXTRACTOR_VERSION = "llm-extractor-v1"
 
 
 class LLMNotAvailable(RuntimeError):
@@ -104,6 +106,7 @@ def _parse_llm_response(
     thread: ReconstructedThread,
     thread_messages: list[dict[str, Any]],
     classification: ClassificationResult,
+    model_version: str,
 ) -> list[ExtractionCandidate]:
     locs = _locators(thread_messages)
     msg_ids = _message_ids(thread_messages)
@@ -137,6 +140,10 @@ def _parse_llm_response(
                 confidence=confidence,
                 review_status=review_status,
                 provenance="llm",
+                extractor_version=LLM_EXTRACTOR_VERSION,
+                model_version=model_version,
+                rule_version=None,
+                created_at=datetime.now(timezone.utc).isoformat(),
             )
         )
     return candidates
@@ -173,18 +180,25 @@ def extract_with_llm(
 
     stats = usage_stats or LLMUsageStats()
     thread_context = _build_thread_context(thread, thread_messages, classification)
+    resolved_model = resolve_llm_model(model)
 
     # Cassette playback for offline CI.
     if cassette is not None and thread.thread_id in cassette:
         raw = cassette[thread.thread_id]
-        candidates = _parse_llm_response(raw, thread, thread_messages, classification)
+        candidates = _parse_llm_response(
+            raw,
+            thread,
+            thread_messages,
+            classification,
+            resolved_model,
+        )
         return LLMExtractionResult(candidates=candidates, usage=stats, cassette_hit=True)
 
     if client is None:
         client = _build_anthropic_client()
 
     response = client.messages.create(
-        model=resolve_llm_model(model),
+        model=resolved_model,
         max_tokens=1024,
         thinking={"type": "adaptive"},
         system=[
@@ -221,7 +235,13 @@ def extract_with_llm(
             raw = block.text
             break
 
-    candidates = _parse_llm_response(raw, thread, thread_messages, classification)
+    candidates = _parse_llm_response(
+        raw,
+        thread,
+        thread_messages,
+        classification,
+        resolved_model,
+    )
     return LLMExtractionResult(candidates=candidates, usage=stats)
 
 

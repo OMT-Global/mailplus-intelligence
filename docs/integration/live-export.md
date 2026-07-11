@@ -21,6 +21,27 @@ A live exporter must honor:
 - privacy boundary: raw message bodies and attachment payloads are never
   exported into durable memory surfaces
 
+The dry-run exporter enforces the same queue boundary. It reloads the artifact
+before writing, validates the complete canonical envelope, and requires the
+latest append-only review event to match the queue revision and eligible state.
+Detached or stale approved snapshots fail closed.
+
+## Export Outbox
+
+Every export target reserves one `export_outbox` row keyed by artifact ID,
+approved revision, export type, and stable target key. That tuple produces a
+deterministic idempotency key, so retrying the same revision cannot create a
+second logical export. The outbox retains the authorizing review event, content
+hash, target metadata, timestamps, failure code, and rollback note.
+
+Dry-run filenames include the approved revision so rolling back an older export
+cannot delete a newer corrected artifact at the same logical target.
+
+When a reviewer moves an approved or corrected artifact to `rollback_needed`,
+its exported outbox records move to the same state. Removal is performed
+separately and then recorded as `rolled_back`; neither the artifact nor review
+history is deleted.
+
 See [promotion review workflow](../promotion-review-workflow.md) for the
 human-review states that gate live writes.
 
@@ -38,5 +59,9 @@ metadata when the target system allows it.
 3. Run the exporter in dry-run mode and inspect the manifest.
 4. Run the live exporter with an explicit target and rollback path.
 
-The local Phase C exporter requires dry-run parity tests, rollback evidence, and
-idempotency tests. Remote exporter PRs remain outside the current vertical slice.
+The dry-run manifest includes the artifact revision, authorizing review event,
+outbox ID, idempotency key, and rollback note for reconciliation.
+
+Live export PRs are welcome once they include dry-run parity tests, rollback
+evidence, target-specific idempotency tests, and executable fixture coverage for
+the local dry-run contract.

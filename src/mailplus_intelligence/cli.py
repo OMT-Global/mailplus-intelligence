@@ -214,7 +214,7 @@ def cmd_thread(args: argparse.Namespace) -> int:
 # ── queue ─────────────────────────────────────────────────────────────────────
 
 def cmd_queue(args: argparse.Namespace) -> int:
-    from .queue import decide, get_item, get_queue
+    from .queue import decide, get_item, get_queue, get_review_history
 
     conn = _setup_db(args.db)
     try:
@@ -229,11 +229,23 @@ def cmd_queue(args: argparse.Namespace) -> int:
                     print(f"[{item.review_status}] {item.artifact_id}  {item.artifact_type}  {item.source_thread_key}")
                     print(f"  {item.summary[:80]}")
 
-        elif args.queue_action in {"approve", "reject", "defer"}:
-            decision_map = {"approve": "approved", "reject": "rejected", "defer": "deferred"}
+        elif args.queue_action in {"approve", "reject", "defer", "rollback"}:
+            decision_map = {
+                "approve": "approved",
+                "reject": "rejected",
+                "defer": "deferred",
+                "rollback": "rollback_needed",
+            }
             decision = decision_map[args.queue_action]
             try:
-                decide(conn, args.artifact_id, decision, reviewer_notes=args.notes)
+                decide(
+                    conn,
+                    args.artifact_id,
+                    decision,
+                    reviewer_notes=args.notes,
+                    reviewer_identity=args.reviewer,
+                    expected_revision=args.expected_revision,
+                )
             except (KeyError, ValueError) as exc:
                 _emit_error(args, f"queue decision failed: {exc}")
                 return 2
@@ -244,8 +256,15 @@ def cmd_queue(args: argparse.Namespace) -> int:
 
         elif args.queue_action == "correct":
             try:
-                decide(conn, args.artifact_id, "corrected",
-                       reviewer_notes=args.notes, corrected_summary=args.corrected_summary)
+                decide(
+                    conn,
+                    args.artifact_id,
+                    "corrected",
+                    reviewer_notes=args.notes,
+                    corrected_summary=args.corrected_summary,
+                    reviewer_identity=args.reviewer,
+                    expected_revision=args.expected_revision,
+                )
             except (KeyError, ValueError) as exc:
                 _emit_error(args, f"queue decision failed: {exc}")
                 return 2
@@ -265,14 +284,29 @@ def cmd_queue(args: argparse.Namespace) -> int:
                 print(f"artifact_id:    {item.artifact_id}")
                 print(f"type:           {item.artifact_type}")
                 print(f"status:         {item.review_status}")
+                print(f"revision:       {item.revision}")
                 print(f"thread:         {item.source_thread_key}")
                 print(f"confidence:     {item.confidence}")
+                print(f"provenance:     {item.provenance} / {item.extractor_version}")
                 print(f"summary:        {item.summary}")
                 if item.corrected_summary:
                     print(f"corrected:      {item.corrected_summary}")
                 print(f"locators:       {item.source_locators}")
+
+        elif args.queue_action == "history":
+            events = get_review_history(conn, args.artifact_id)
+            if args.json:
+                print(json.dumps([event.__dict__ for event in events], indent=2))
+            else:
+                if not events:
+                    print(f"No review history: {args.artifact_id}")
+                for event in events:
+                    print(
+                        f"r{event.artifact_revision} {event.prior_status} -> "
+                        f"{event.new_status} by {event.reviewer_identity} at {event.occurred_at}"
+                    )
         else:
-            _emit_error(args, "Usage: mpi queue {list|inspect|approve|reject|defer|correct}")
+            _emit_error(args, "Usage: mpi queue {list|inspect|history|approve|reject|defer|rollback|correct}")
             return 1
     finally:
         conn.close()
@@ -286,37 +320,40 @@ def cmd_export(args: argparse.Namespace) -> int:
     from .exporters import export_approved_candidates
     from .queue import get_queue
 
+    output_dir = Path(args.output)
     conn = _setup_db(args.db)
     try:
         approved = get_queue(conn, status="approved") + get_queue(conn, status="corrected")
+        artifacts = (
+            export_approved_candidates(
+                approved,
+                output_dir,
+                connection=conn,
+                dry_run=True,
+            )
+            if approved
+            else []
+        )
     finally:
         conn.close()
 
-    if not approved:
-        if args.json:
-            print(json.dumps({
-                "dry_run": True,
-                "artifact_count": 0,
-                "artifacts": [],
-                "output": str(Path(args.output)),
-            }, indent=2))
-        else:
-            print("No approved candidates to export.")
-        return 0
-
-    output_dir = Path(args.output)
-    artifacts = export_approved_candidates(approved, output_dir, dry_run=True)
     if args.json:
         print(json.dumps({
             "dry_run": True,
             "artifact_count": len(artifacts),
-            "artifacts": [{"artifact_id": a.artifact_id, "target_path": a.target_path} for a in artifacts],
+            "artifacts": [
+                {"artifact_id": a.artifact_id, "target_path": a.target_path}
+                for a in artifacts
+            ],
             "output": str(output_dir),
         }, indent=2))
     else:
-        print(f"Dry-run export: {len(artifacts)} artifact(s) → {output_dir}")
-        for artifact in artifacts:
-            print(f"  {artifact.target_path}")
+        if not artifacts:
+            print("No approved candidates to export.")
+        else:
+            print(f"Dry-run export: {len(artifacts)} artifact(s) -> {output_dir}")
+            for artifact in artifacts:
+                print(f"  {artifact.target_path}")
     return 0
 
 
@@ -351,14 +388,19 @@ def cmd_seed(args: argparse.Namespace) -> int:
         print(json.dumps({
             "success": result.success,
             "inserted": result.inserted,
-            "skipped": result.skipped,
+            "updated": result.updated,
+            "unchanged": result.unchanged,
+            "rejected": result.rejected,
+            "failed": result.failed,
             "queued": queued,
             "queue_skipped": skipped,
         }, indent=2))
     else:
         print(
             "Seeded fixture corpus: "
-            f"inserted={result.inserted}, skipped={result.skipped}, "
+            f"inserted={result.inserted}, updated={result.updated}, "
+            f"unchanged={result.unchanged}, rejected={result.rejected}, "
+            f"failed={result.failed}, "
             f"queued={queued}, queue_skipped={skipped}."
         )
     return 0 if result.success else 1
@@ -468,15 +510,19 @@ def build_parser() -> argparse.ArgumentParser:
     ql.add_argument("--status", help="Filter by review_status")
     ql.add_argument("--type", help="Filter by artifact_type")
     ql.add_argument("--limit", type=int, default=100)
-    qa.add_parser("approve").add_argument("artifact_id")
-    qa.add_parser("reject").add_argument("artifact_id")
-    qa.add_parser("defer").add_argument("artifact_id")
     qa.add_parser("inspect").add_argument("artifact_id")
-    for name in ("approve", "reject", "defer"):
-        qa.choices[name].add_argument("--notes")
+    qa.add_parser("history").add_argument("artifact_id")
+    for name in ("approve", "reject", "defer", "rollback"):
+        action = qa.add_parser(name)
+        action.add_argument("artifact_id")
+        action.add_argument("--reviewer", required=True)
+        action.add_argument("--expected-revision", type=int, required=True)
+        action.add_argument("--notes", required=name == "rollback")
     cc = qa.add_parser("correct")
     cc.add_argument("artifact_id")
     cc.add_argument("--corrected-summary", dest="corrected_summary", required=True)
+    cc.add_argument("--reviewer", required=True)
+    cc.add_argument("--expected-revision", type=int, required=True)
     cc.add_argument("--notes")
 
     # export
@@ -567,6 +613,9 @@ def main(argv: list[str] | None = None) -> int:
             args,
             f"error: sqlite operation failed: {exc}. Check that the database parent directory exists.",
         )
+        return 2
+    except (KeyError, ValueError) as exc:
+        _emit_error(args, f"error: {exc}")
         return 2
     except _runtime_configuration_errors() as exc:
         _emit_error(args, f"error: {exc}")
