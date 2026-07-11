@@ -2,7 +2,7 @@
 set -euo pipefail
 
 mode="${1:-"--all-files"}"
-ignore_globs=("scripts/check-detect-secrets.sh")
+ignore_globs=("scripts/check-detect-secrets.sh" ".env.example")
 if [[ -f .detect-secrets-ignore ]]; then
   while IFS= read -r ignore_glob; do
     if [[ -z "$ignore_glob" ]]; then
@@ -89,9 +89,11 @@ mailplus_content_patterns=(
 )
 
 mailplus_path_patterns=(
+  '(^|/)\.env(\.|$)'
   '\.eml$'
   '\.mbox$'
-  '(^|/)(mailplus|selected-text|semantic|metadata)[^/]*\.(db|sqlite|sqlite3)$'
+  '\.(db|sqlite|sqlite3)(-(wal|shm))?$'
+  '(^|/)(exports|mailplus-exports)(/|$)'
   '(^|/)(mailplus|selected-text|semantic|metadata)[^/]*\.(cache|log)$'
 )
 

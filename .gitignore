@@ -4,3 +4,15 @@ __pycache__/
 *.egg-info/
 .coverage
 .pytest_cache/
+.env
+.env.*
+!.env.example
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+*.sqlite-wal
+*.sqlite-shm
+exports/
+mailplus-exports/

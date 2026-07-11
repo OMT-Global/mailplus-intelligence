@@ -74,7 +74,7 @@ github:
     hasWiki: false
     hasDiscussions: false
   security:
-    dependabot: false
+    dependabot: true
     secretScanningHints: true
 ci:
   policy: experimental

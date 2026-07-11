@@ -1,0 +1,6 @@
+self-hosted-runner:
+  labels:
+    - synology
+    - shell-only
+    - private
+    - public

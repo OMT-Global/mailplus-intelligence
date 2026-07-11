@@ -74,6 +74,18 @@ class SecretScanScriptTests(unittest.TestCase):
         self.assertNotEqual(alias_result.returncode, 0)
         self.assertIn("mailplus-export.eml", alias_result.stderr)
 
+    def test_env_database_sidecar_and_export_directory_are_detected(self) -> None:
+        self.write_file(".env", "MAILPLUS_HOST=example.test\n")
+        self.write_file("state.sqlite-wal", "synthetic sqlite sidecar\n")
+        self.write_file("exports/summary.json", "{}\n")
+
+        result = self.run_scan("--all-files-with-untracked")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(".env", result.stderr)
+        self.assertIn("state.sqlite-wal", result.stderr)
+        self.assertIn("exports/summary.json", result.stderr)
+
     def test_mailplus_link_leak_is_detected(self) -> None:
         live_link = "https://mail.vendor.invalid/reset?" + "token=abc123"
         self.write_file("message.txt", f"Reset at {live_link}\n")
