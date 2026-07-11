@@ -16,12 +16,5 @@
   "mounts": [
     "source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind"
   ],
-  "postCreateCommand": "bash scripts/claude/setup-devcontainer.sh",
-  "customizations": {
-    "vscode": {
-      "settings": {
-        "terminal.integrated.defaultProfile.linux": "bash"
-      }
-    }
-  }
+  "postCreateCommand": "bash scripts/claude/setup-devcontainer.sh"
 }
