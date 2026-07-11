@@ -298,6 +298,52 @@ class SyncTests(unittest.TestCase):
         )
         self.assertIsNone(get_checkpoint(self.conn, "mixed-source"))
 
+    def test_header_linked_messages_share_a_canonical_thread_without_fixture_hints(self) -> None:
+        corpus = load_metadata_fixture_corpus(FIXTURE_DIR)
+        messages = [copy.deepcopy(message) for message in corpus.messages[:3]]
+        for message in messages:
+            message.pop("thread_hint", None)
+
+        result = run_sync_batch(self.conn, SyncBatch("header-thread", "v1", tuple(messages)))
+
+        self.assertTrue(result.success)
+        rows = self.conn.execute(
+            """
+            SELECT DISTINCT t.thread_key
+            FROM messages m JOIN threads t ON t.id = m.thread_id
+            ORDER BY t.thread_key
+            """
+        ).fetchall()
+        self.assertEqual(len(rows), 1)
+        self.assertTrue(rows[0]["thread_key"].startswith("thread-"))
+
+    def test_decisions_and_locator_history_are_persisted_with_project_override(self) -> None:
+        corpus = load_metadata_fixture_corpus(FIXTURE_DIR)
+        message = copy.deepcopy(corpus.messages[0])
+        message.pop("thread_hint", None)
+        message["subject"] = "Limited time discount"
+        message["labels"] = ["project"]
+
+        result = run_sync_batch(self.conn, SyncBatch("decision-source", "v1", (message,)))
+
+        self.assertTrue(result.success)
+        decision = self.conn.execute(
+            """
+            SELECT lane, suppression_action, extraction_eligible, reason_codes
+            FROM ingest_decisions WHERE locator_export_id = ?
+            """,
+            (message["locator"]["export_id"],),
+        ).fetchone()
+        self.assertEqual(decision["lane"], "project")
+        self.assertEqual(decision["suppression_action"], "allow")
+        self.assertEqual(decision["extraction_eligible"], 1)
+        self.assertIn("project-operator-override", decision["reason_codes"])
+        history = self.conn.execute(
+            "SELECT COUNT(*) FROM message_locator_history WHERE locator_export_id = ?",
+            (message["locator"]["export_id"],),
+        ).fetchone()[0]
+        self.assertEqual(history, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

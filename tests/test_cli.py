@@ -5,8 +5,10 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from mailplus_intelligence.cli import build_parser, main
@@ -46,6 +48,16 @@ class CLIParserTests(unittest.TestCase):
     def test_search_subcommand_no_results_memory_db(self):
         rc = main(["--db", ":memory:", "search", "--keyword", "Atlas"])
         self.assertEqual(rc, 0)
+
+    @mock.patch.dict(os.environ, {}, clear=True)
+    def test_live_sync_requires_explicit_configuration_without_network_access(self):
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            rc = main(["--json", "sync", "run", "--dry-run"])
+        self.assertEqual(rc, 2)
+        payload = json.loads(err.getvalue())
+        self.assertIn("MAILPLUS_HOST", payload["error"])
+        self.assertNotIn("synthetic-secret", payload["error"])
 
     def test_no_subcommand_returns_nonzero(self):
         rc = main([])
@@ -204,6 +216,13 @@ class CLISearchTests(unittest.TestCase):
             rc = main(["--db", self.tmp.name, "thread", "no-such-thread", "--json"])
         self.assertEqual(rc, 1)
         self.assertFalse(json.loads(err.getvalue())["ok"])
+
+    def test_history_subcommand_returns_metadata_only_timeline(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            rc = main(["--db", self.tmp.name, "history", "alice@example.test"])
+        self.assertEqual(rc, 0)
+        self.assertIn("locator:", out.getvalue())
 
 
 class CLIQueueTests(unittest.TestCase):

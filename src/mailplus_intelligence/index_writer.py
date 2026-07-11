@@ -705,14 +705,20 @@ def search_messages(
     connection: sqlite3.Connection,
     *,
     sender: str | None = None,
+    correspondent: str | None = None,
+    recipient: str | None = None,
     subject_keyword: str | None = None,
     folder: str | None = None,
+    mailbox: str | None = None,
+    label: str | None = None,
+    flag: str | None = None,
     has_attachments: bool | None = None,
     attachment_name_contains: str | None = None,
     attachment_mime_type: str | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
     thread_key: str | None = None,
+    cursor: str | None = None,
     limit: int = 50,
 ) -> list[dict]:
     """Search index records with optional filters. Returns dicts with MailPlus locators."""
@@ -721,14 +727,29 @@ def search_messages(
     params: list[object] = []
 
     if sender:
-        clauses.append("p.email LIKE ?")
+        clauses.append("EXISTS (SELECT 1 FROM message_participants smp JOIN participants sp ON sp.id = smp.participant_id WHERE smp.message_id = m.id AND smp.role = 'from' AND sp.email LIKE ?)")
         params.append(f"%{sender}%")
+    if correspondent:
+        clauses.append("EXISTS (SELECT 1 FROM message_participants cmp JOIN participants cp ON cp.id = cmp.participant_id WHERE cmp.message_id = m.id AND cp.email LIKE ?)")
+        params.append(f"%{correspondent}%")
+    if recipient:
+        clauses.append("EXISTS (SELECT 1 FROM message_participants rmp JOIN participants rp ON rp.id = rmp.participant_id WHERE rmp.message_id = m.id AND rmp.role IN ('to', 'cc', 'bcc') AND rp.email LIKE ?)")
+        params.append(f"%{recipient}%")
     if subject_keyword:
         clauses.append("m.subject LIKE ?")
         params.append(f"%{subject_keyword}%")
     if folder:
         clauses.append("mb.folder_path LIKE ?")
         params.append(f"%{folder}%")
+    if mailbox:
+        clauses.append("mb.mailbox LIKE ?")
+        params.append(f"%{mailbox}%")
+    if label:
+        clauses.append("EXISTS (SELECT 1 FROM message_labels ml JOIN labels l ON l.id = ml.label_id WHERE ml.message_id = m.id AND l.name = ?)")
+        params.append(label)
+    if flag:
+        clauses.append("EXISTS (SELECT 1 FROM message_flags mf JOIN flags f ON f.id = mf.flag_id WHERE mf.message_id = m.id AND f.name = ?)")
+        params.append(flag)
     if has_attachments is not None:
         clauses.append("m.has_attachments = ?")
         params.append(1 if has_attachments else 0)
@@ -741,6 +762,15 @@ def search_messages(
     if thread_key:
         clauses.append("t.thread_key = ?")
         params.append(thread_key)
+    if cursor:
+        try:
+            cursor_sent_at, cursor_locator = cursor.split("|", 1)
+        except ValueError as exc:
+            raise ValueError("cursor must be '<sent_at>|<locator_export_id>'") from exc
+        clauses.append("(m.sent_at < ? OR (m.sent_at = ? AND m.locator_export_id > ?))")
+        params.extend((cursor_sent_at, cursor_sent_at, cursor_locator))
+    if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 200:
+        raise ValueError("limit must be an integer between 1 and 200")
 
     need_attachment_join = attachment_name_contains or attachment_mime_type
     attachment_clauses: list[str] = []
@@ -760,12 +790,6 @@ def search_messages(
     if need_attachment_join:
         attachment_join = "JOIN attachments a ON a.message_id = m.id"
 
-    sender_join = ""
-    if sender:
-        sender_join = "JOIN message_participants mp ON mp.message_id = m.id AND mp.role = 'from' JOIN participants p ON p.id = mp.participant_id"
-    else:
-        sender_join = "LEFT JOIN message_participants mp ON mp.message_id = m.id AND mp.role = 'from' LEFT JOIN participants p ON p.id = mp.participant_id"
-
     sql = f"""
         SELECT DISTINCT m.message_id, m.subject, m.sent_at, m.has_attachments,
                m.locator_export_id, m.locator_uid,
@@ -774,13 +798,20 @@ def search_messages(
         FROM messages m
         JOIN mailboxes mb ON mb.id = m.mailbox_id
         LEFT JOIN threads t ON t.id = m.thread_id
-        {sender_join}
         {attachment_join}
         {where}
-        ORDER BY m.sent_at DESC
+        ORDER BY m.sent_at DESC, m.locator_export_id ASC
         LIMIT ?
     """
     params.append(limit)
 
     rows = connection.execute(sql, params).fetchall()
-    return [dict(row) for row in rows]
+    results = [dict(row) for row in rows]
+    for row in results:
+        message_db_id = connection.execute("SELECT id FROM messages WHERE locator_export_id = ?", (row["locator_export_id"],)).fetchone()[0]
+        row["participants"] = [dict(item) for item in connection.execute("SELECT mp.role, p.email FROM message_participants mp JOIN participants p ON p.id = mp.participant_id WHERE mp.message_id = ? ORDER BY mp.role, p.email", (message_db_id,)).fetchall()]
+        row["labels"] = [item[0] for item in connection.execute("SELECT l.name FROM message_labels ml JOIN labels l ON l.id = ml.label_id WHERE ml.message_id = ? ORDER BY l.name", (message_db_id,)).fetchall()]
+        row["flags"] = [item[0] for item in connection.execute("SELECT f.name FROM message_flags mf JOIN flags f ON f.id = mf.flag_id WHERE mf.message_id = ? ORDER BY f.name", (message_db_id,)).fetchall()]
+        row["attachments"] = [dict(item) for item in connection.execute("SELECT filename, content_type, size_bytes, inline_flag FROM attachments WHERE message_id = ? ORDER BY filename", (message_db_id,)).fetchall()]
+        row["cursor"] = f"{row['sent_at']}|{row['locator_export_id']}"
+    return results

@@ -136,9 +136,9 @@ def _warn_if_ephemeral_db(args: argparse.Namespace) -> None:
 def _runtime_configuration_errors() -> tuple[type[BaseException], ...]:
     errors: list[type[BaseException]] = []
     try:
-        from .live_adapter import LiveAdapterNotConfigured
+        from .live_adapter import LiveAdapterError
 
-        errors.append(LiveAdapterNotConfigured)
+        errors.append(LiveAdapterError)
     except ImportError:
         pass
 
@@ -162,14 +162,20 @@ def cmd_search(args: argparse.Namespace) -> int:
         results = search_messages(
             conn,
             sender=args.sender,
+            correspondent=args.correspondent,
+            recipient=args.recipient,
             subject_keyword=args.keyword,
             folder=args.folder,
+            mailbox=args.mailbox,
+            label=args.label,
+            flag=args.flag,
             has_attachments=True if args.has_attachments else None,
             attachment_name_contains=args.attachment_name,
             attachment_mime_type=args.attachment_type,
             date_from=args.date_from,
             date_to=args.date_to,
             thread_key=args.thread,
+            cursor=args.cursor,
             limit=args.limit,
         )
     finally:
@@ -184,6 +190,25 @@ def cmd_search(args: argparse.Namespace) -> int:
         for row in results:
             print(f"{row.get('sent_at','?')}  {row.get('message_id','?')}  {row.get('subject','?')}")
             print(f"  locator: {row.get('locator_export_id','?')} / uid={row.get('locator_uid','?')}")
+    return 0
+
+
+def cmd_history(args: argparse.Namespace) -> int:
+    from .index_writer import search_messages
+
+    conn = _setup_db(args.db)
+    try:
+        results = search_messages(conn, correspondent=args.correspondent, limit=args.limit)
+    finally:
+        conn.close()
+    if args.json:
+        print(json.dumps(results, indent=2))
+    elif not results:
+        print("No history found.")
+    else:
+        for row in reversed(results):
+            print(f"{row['sent_at']}  [{row.get('thread_key', '?')}]  {row['subject']}")
+            print(f"  locator: {row['locator_export_id']} / uid={row['locator_uid']}")
     return 0
 
 
@@ -411,7 +436,7 @@ def cmd_seed(args: argparse.Namespace) -> int:
 
 def cmd_sync(args: argparse.Namespace) -> int:
     from .scheduler import get_job_status, list_jobs
-    from .sync import get_checkpoint
+    from .sync import get_checkpoint, run_sync_batch
 
     conn = _setup_db(args.db)
     try:
@@ -448,8 +473,27 @@ def cmd_sync(args: argparse.Namespace) -> int:
                 print(f"cursor:         {cp.get('cursor') or '(none)'}")
                 print(f"last attempt:   {cp.get('last_attempt_at') or 'never'}")
                 print(f"last success:   {cp.get('last_success_at') or 'never'}")
+        elif args.sync_action == "run":
+            from .live_adapter import fetch_batch, load_live_config
+
+            config = load_live_config()
+            batch = fetch_batch(config, cursor=args.cursor or "")
+            result = run_sync_batch(conn, batch, dry_run=args.dry_run)
+            payload = {
+                "source": result.source_name,
+                "cursor": result.cursor,
+                "dry_run": result.dry_run,
+                "success": result.success,
+                "inserted": result.inserted,
+                "updated": result.updated,
+                "unchanged": result.unchanged,
+                "rejected": result.rejected,
+                "failed": result.failed,
+            }
+            print(json.dumps(payload, indent=2) if args.json else "sync " + " ".join(f"{key}={value}" for key, value in payload.items()))
+            return 0 if result.success else 1
         else:
-            _emit_error(args, "Usage: mpi sync {status|checkpoint}")
+            _emit_error(args, "Usage: mpi sync {status|checkpoint|run}")
             return 1
     finally:
         conn.close()
@@ -489,15 +533,25 @@ def build_parser() -> argparse.ArgumentParser:
     # search
     sp = sub.add_parser("search", help="Search indexed messages")
     sp.add_argument("--sender", help="Filter by sender email substring")
+    sp.add_argument("--correspondent", help="Match any participant address or domain")
+    sp.add_argument("--recipient", help="Match a to/cc/bcc participant")
     sp.add_argument("--keyword", help="Filter by subject keyword")
     sp.add_argument("--folder", help="Filter by folder path substring")
+    sp.add_argument("--mailbox", help="Filter by mailbox name")
+    sp.add_argument("--label", help="Filter by exact label")
+    sp.add_argument("--flag", help="Filter by exact flag")
     sp.add_argument("--has-attachments", action="store_true", default=None)
     sp.add_argument("--attachment-name", dest="attachment_name", help="Attachment filename contains")
     sp.add_argument("--attachment-type", dest="attachment_type", help="Attachment MIME type (exact)")
     sp.add_argument("--date-from", dest="date_from", help="Sent on or after (ISO 8601)")
     sp.add_argument("--date-to", dest="date_to", help="Sent on or before (ISO 8601)")
     sp.add_argument("--thread", help="Filter by thread key")
+    sp.add_argument("--cursor", help="Continue after a result cursor")
     sp.add_argument("--limit", type=int, default=50)
+
+    hp = sub.add_parser("history", help="Show metadata-only correspondence history")
+    hp.add_argument("correspondent")
+    hp.add_argument("--limit", type=int, default=100)
 
     # thread
     tp = sub.add_parser("thread", help="Inspect a reconstructed thread")
@@ -545,6 +599,9 @@ def build_parser() -> argparse.ArgumentParser:
     ss.add_argument("--job", help="Filter by job name")
     sc = sya.add_parser("checkpoint", help="Show sync checkpoint for a source")
     sc.add_argument("--source", help="Source name (default: fixture-corpus)")
+    sr = sya.add_parser("run", help="Run a credential-gated read-only IMAP metadata sync")
+    sr.add_argument("--cursor", help="Existing IMAP UIDVALIDITY/UID cursor")
+    sr.add_argument("--dry-run", action="store_true", help="Fetch and validate without writing the index or checkpoint")
 
     # doctor
     dp = sub.add_parser("doctor", help="Run fixture-mode preflight checks")
@@ -584,6 +641,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "search":
             return cmd_search(args)
+        elif args.command == "history":
+            return cmd_history(args)
         elif args.command == "thread":
             return cmd_thread(args)
         elif args.command == "queue":

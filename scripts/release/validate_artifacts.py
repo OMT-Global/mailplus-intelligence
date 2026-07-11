@@ -10,12 +10,12 @@ import zipfile
 from pathlib import Path
 
 
-REQUIRED_MIGRATIONS = (
-    "001_metadata_schema_v0.sql",
-    "002_attachment_metadata.sql",
-    "003_cache_and_queue.sql",
-    "004_semantic_provenance_review.sql",
+_SOURCE_MIGRATIONS = (
+    Path(__file__).resolve().parents[2] / "src" / "mailplus_intelligence" / "migrations"
 )
+REQUIRED_MIGRATIONS = tuple(sorted(path.name for path in _SOURCE_MIGRATIONS.glob("*.sql")))
+if not REQUIRED_MIGRATIONS:
+    raise RuntimeError("release artifact validator could not find source migration resources")
 
 
 class ArtifactValidationError(RuntimeError):

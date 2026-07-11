@@ -7,7 +7,10 @@ import unittest
 from unittest import mock
 
 from mailplus_intelligence.live_adapter import (
+    LiveAuthenticationError,
+    LiveCursorInvalidated,
     LiveAdapterNotConfigured,
+    LiveAdapterConfig,
     fetch_batch,
     load_live_config,
 )
@@ -109,21 +112,61 @@ class LiveAdapterConfigTests(unittest.TestCase):
         self.assertNotIn("synthetic-token", str(raised.exception))
 
 
-class LiveAdapterStubTests(unittest.TestCase):
+class FakeIMAP:
+    def __init__(self, *, uidvalidity: bytes = b"42", login_status: str = "OK") -> None:
+        self.uidvalidity = uidvalidity
+        self.login_status = login_status
+        self.fetch_arguments: list[tuple] = []
+
+    def login(self, user, password):
+        return self.login_status, [b"ok"]
+
+    def select(self, mailbox, readonly=False):
+        self.readonly = readonly
+        return "OK", [b"2"]
+
+    def response(self, code):
+        return "OK", [self.uidvalidity]
+
+    def uid(self, command, *args):
+        if command == "search":
+            return "OK", [b"10 11"]
+        self.fetch_arguments.append((command, *args))
+        uid = args[0]
+        headers = (
+            f"Message-ID: <imap-{uid}@example.test>\r\n"
+            "Subject: Read-only metadata\r\n"
+            "From: sender@example.test\r\n"
+            "To: recipient@example.test\r\n"
+            "Date: Mon, 05 Jan 2026 14:00:00 +0000\r\n\r\n"
+        ).encode()
+        return "OK", [(b"11 (FLAGS (\\Seen \\Flagged))", headers)]
+
+    def logout(self):
+        return "BYE", [b"done"]
+
+
+class LiveAdapterIMAPTests(unittest.TestCase):
     def _make_config(self):
-        from mailplus_intelligence.live_adapter import LiveAdapterConfig
         return LiveAdapterConfig(host="imap.example.com", user="u@example.com", token="t")
 
-    def test_fetch_batch_returns_empty_stub(self) -> None:
-        config = self._make_config()
-        batch = fetch_batch(config)
-        self.assertEqual(batch.messages, ())
-        self.assertEqual(batch.source_name, "live:u@example.com")
+    def test_fetches_headers_only_and_builds_uidvalidity_cursor(self) -> None:
+        fake = FakeIMAP()
+        batch = fetch_batch(self._make_config(), client_factory=lambda *_: fake)
+        self.assertTrue(fake.readonly)
+        self.assertEqual(batch.cursor, "uidvalidity:42;uid:11")
+        self.assertEqual(len(batch.messages), 2)
+        self.assertEqual(batch.messages[0]["flags"], ["\\Seen", "\\Flagged"])
+        self.assertTrue(all("BODY.PEEK[HEADER.FIELDS" in call[2] for call in fake.fetch_arguments))
+        self.assertFalse(any("RFC822" in call[2] for call in fake.fetch_arguments))
 
-    def test_fetch_batch_source_name_includes_user(self) -> None:
-        config = self._make_config()
-        batch = fetch_batch(config, cursor="abc")
-        self.assertIn("u@example.com", batch.source_name)
+    def test_uidvalidity_change_fails_closed(self) -> None:
+        with self.assertRaises(LiveCursorInvalidated):
+            fetch_batch(self._make_config(), "uidvalidity:old;uid:10", client_factory=lambda *_: FakeIMAP())
+
+    def test_authentication_failure_is_typed(self) -> None:
+        with self.assertRaises(LiveAuthenticationError):
+            fetch_batch(self._make_config(), client_factory=lambda *_: FakeIMAP(login_status="NO"))
 
 
 if __name__ == "__main__":
