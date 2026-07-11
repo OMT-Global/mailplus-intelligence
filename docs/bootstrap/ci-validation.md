@@ -10,7 +10,7 @@ Run locally with:
 bash scripts/ci/run-fast-checks.sh
 ```
 
-Fast validation is the required PR lane. It must stay shell-safe for `[self-hosted, synology, shell-only, private]` runners and must not require Docker, service containers, browser infrastructure, live MailPlus access, or operator credentials.
+Fast validation is the required PR lane. It runs on GitHub-hosted runners so fork-controlled code cannot access persistent self-hosted runner state. It must not require Docker, service containers, browser infrastructure, live MailPlus access, or operator credentials.
 
 The fast lane currently checks:
 
@@ -19,6 +19,11 @@ The fast lane currently checks:
 - Every `bash fixture-smoke` command block in `docs/quickstart.md` and
   `docs/ops-runbooks.md`, executed verbatim in an isolated temporary workspace.
 - Unit tests with `PYTHONPATH=src python -m unittest discover -s tests -v`.
+- Actionlint and GitHub dependency review on each ready-for-review PR.
+
+External actions are pinned to immutable commit SHAs. Trusted post-merge and
+release jobs may use the documented private self-hosted runner labels; PR jobs
+must remain GitHub-hosted and check out without persisted credentials.
 
 ## Extended validation
 
