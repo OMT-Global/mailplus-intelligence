@@ -136,9 +136,9 @@ def _warn_if_ephemeral_db(args: argparse.Namespace) -> None:
 def _runtime_configuration_errors() -> tuple[type[BaseException], ...]:
     errors: list[type[BaseException]] = []
     try:
-        from .live_adapter import LiveAdapterNotConfigured
+        from .live_adapter import LiveAdapterError
 
-        errors.append(LiveAdapterNotConfigured)
+        errors.append(LiveAdapterError)
     except ImportError:
         pass
 
@@ -436,7 +436,7 @@ def cmd_seed(args: argparse.Namespace) -> int:
 
 def cmd_sync(args: argparse.Namespace) -> int:
     from .scheduler import get_job_status, list_jobs
-    from .sync import get_checkpoint
+    from .sync import get_checkpoint, run_sync_batch
 
     conn = _setup_db(args.db)
     try:
@@ -473,8 +473,27 @@ def cmd_sync(args: argparse.Namespace) -> int:
                 print(f"cursor:         {cp.get('cursor') or '(none)'}")
                 print(f"last attempt:   {cp.get('last_attempt_at') or 'never'}")
                 print(f"last success:   {cp.get('last_success_at') or 'never'}")
+        elif args.sync_action == "run":
+            from .live_adapter import fetch_batch, load_live_config
+
+            config = load_live_config()
+            batch = fetch_batch(config, cursor=args.cursor or "")
+            result = run_sync_batch(conn, batch, dry_run=args.dry_run)
+            payload = {
+                "source": result.source_name,
+                "cursor": result.cursor,
+                "dry_run": result.dry_run,
+                "success": result.success,
+                "inserted": result.inserted,
+                "updated": result.updated,
+                "unchanged": result.unchanged,
+                "rejected": result.rejected,
+                "failed": result.failed,
+            }
+            print(json.dumps(payload, indent=2) if args.json else "sync " + " ".join(f"{key}={value}" for key, value in payload.items()))
+            return 0 if result.success else 1
         else:
-            _emit_error(args, "Usage: mpi sync {status|checkpoint}")
+            _emit_error(args, "Usage: mpi sync {status|checkpoint|run}")
             return 1
     finally:
         conn.close()
@@ -580,6 +599,9 @@ def build_parser() -> argparse.ArgumentParser:
     ss.add_argument("--job", help="Filter by job name")
     sc = sya.add_parser("checkpoint", help="Show sync checkpoint for a source")
     sc.add_argument("--source", help="Source name (default: fixture-corpus)")
+    sr = sya.add_parser("run", help="Run a credential-gated read-only IMAP metadata sync")
+    sr.add_argument("--cursor", help="Existing IMAP UIDVALIDITY/UID cursor")
+    sr.add_argument("--dry-run", action="store_true", help="Fetch and validate without writing the index or checkpoint")
 
     # doctor
     dp = sub.add_parser("doctor", help="Run fixture-mode preflight checks")
