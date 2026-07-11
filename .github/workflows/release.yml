@@ -28,9 +28,6 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install build backend
-        run: python -m pip install --upgrade pip build
-
       - name: Validate tag and build artifacts
         env:
           RELEASE_TAG: ${{ github.ref_name }}

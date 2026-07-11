@@ -131,9 +131,6 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install build backend
-        run: python -m pip install --upgrade pip build
-
       - name: Build distribution artifacts
         run: bash scripts/release/dry-run.sh --skip-fast-checks
 

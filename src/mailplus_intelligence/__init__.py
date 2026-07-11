@@ -11,7 +11,7 @@ from .suppression import SUPPRESSION_FAMILIES, SuppressionDecision, classify_noi
 try:
     __version__ = version("mailplus-intelligence")
 except PackageNotFoundError:
-    __version__ = "0.1.0+source"
+    __version__ = "0.1.1+source"
 
 __all__ = [
     "MetadataFixtureCorpus",

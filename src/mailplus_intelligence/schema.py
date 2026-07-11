@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
+from importlib import resources
 import sqlite3
-from pathlib import Path
-
-
-MIGRATIONS_DIR = Path(__file__).resolve().parent / "migrations"
 
 
 _MIGRATIONS = [
@@ -16,11 +13,22 @@ _MIGRATIONS = [
 ]
 
 
+def _read_migration(filename: str) -> str:
+    """Read a migration from the installed package resource tree."""
+
+    migration = resources.files("mailplus_intelligence").joinpath("migrations", filename)
+    try:
+        return migration.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(
+            f"required migration package resource is missing: migrations/{filename}"
+        ) from exc
+
+
 def apply_schema_v0(connection: sqlite3.Connection) -> None:
     """Apply the v0 metadata schema to an open SQLite connection."""
 
-    migration_path = MIGRATIONS_DIR / "001_metadata_schema_v0.sql"
-    connection.executescript(migration_path.read_text(encoding="utf-8"))
+    connection.executescript(_read_migration("001_metadata_schema_v0.sql"))
 
 
 def apply_all_migrations(connection: sqlite3.Connection) -> None:
@@ -31,7 +39,7 @@ def apply_all_migrations(connection: sqlite3.Connection) -> None:
         target_version = index + 1
         if current_version >= target_version:
             continue
-        connection.executescript((MIGRATIONS_DIR / filename).read_text(encoding="utf-8"))
+        connection.executescript(_read_migration(filename))
         current_version = target_version
 
 

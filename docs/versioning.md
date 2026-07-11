@@ -15,8 +15,23 @@ The package version is declared in `pyproject.toml` and exposed at runtime as
 the version into README examples or docs unless the surrounding text is release
 history.
 
+The prepared package version is `0.1.1`, and its proposed Git tag is `v0.1.1`.
+The tag must not be created until the remaining Phase A release gates in issue
+#98 are complete.
+
+## v0.1.0 Limitation
+
+The public `v0.1.0` tag is historical but not installable. It points to a
+documentation-only commit from before the repository contained
+`pyproject.toml`, the `src/mailplus_intelligence` package, or buildable release
+artifacts. Do not delete, move, or recreate that tag. The prepared `v0.1.1`
+patch is the first package release candidate intended to provide working wheel
+and source-distribution artifacts.
+
 ## Release Notes
 
 Every release should update `CHANGELOG.md` with operator-facing changes, known
 stubs, and any compatibility notes. Commit-level detail belongs in the GitHub
-history, not the changelog.
+history, not the changelog. The release workflow uses the matching version
+section in `CHANGELOG.md` as the GitHub release notes, so the package version,
+changelog heading, and proposed tag must agree before tagging.

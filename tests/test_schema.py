@@ -1,11 +1,38 @@
 from __future__ import annotations
 
 import unittest
+from unittest import mock
 
-from mailplus_intelligence import apply_schema_v0, connect_sqlite, current_schema_version
+from mailplus_intelligence import (
+    apply_all_migrations,
+    apply_schema_v0,
+    connect_sqlite,
+    current_schema_version,
+)
 
 
 class MetadataSchemaV0Tests(unittest.TestCase):
+    def test_all_packaged_migrations_apply_to_an_empty_database(self) -> None:
+        connection = connect_sqlite()
+        try:
+            apply_all_migrations(connection)
+            self.assertEqual(current_schema_version(connection), 3)
+        finally:
+            connection.close()
+
+    def test_missing_migration_resource_has_an_actionable_error(self) -> None:
+        with mock.patch("mailplus_intelligence.schema.resources.files") as files:
+            files.return_value.joinpath.return_value.read_text.side_effect = FileNotFoundError
+            connection = connect_sqlite()
+            try:
+                with self.assertRaisesRegex(
+                    FileNotFoundError,
+                    "required migration package resource is missing: migrations/001_metadata_schema_v0.sql",
+                ):
+                    apply_schema_v0(connection)
+            finally:
+                connection.close()
+
     def test_schema_bootstrap_creates_core_tables_and_version(self) -> None:
         connection = connect_sqlite()
         try:
