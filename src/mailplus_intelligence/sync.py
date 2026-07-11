@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from .index_writer import WriteResult, write_index_records
-from .mapper import map_fixture_messages
+from .ingest import IngestDecision, prepare_ingest
 
 
 @dataclass(frozen=True)
@@ -87,8 +87,8 @@ def run_sync_batch(
     is unchanged and drifted metadata is updated. Applied data and checkpoint
     advancement share one transaction and are rolled back together on failure.
     """
-    map_result = map_fixture_messages(list(batch.messages))
-    planned = write_index_records(connection, map_result.records, dry_run=True)
+    prepared = prepare_ingest(list(batch.messages))
+    planned = write_index_records(connection, prepared.records, dry_run=True)
     rejections = tuple(
         SyncRejection(
             source_name=batch.source_name,
@@ -97,14 +97,14 @@ def run_sync_batch(
             code=issue.code,
             reason=issue.message,
         )
-        for issue in map_result.rejections
+        for issue in prepared.mapper.rejections
     )
 
     if dry_run or rejections or planned.failed:
         return _sync_result(
             batch,
             planned,
-            mapper_issues=len(map_result.issues),
+            mapper_issues=len(prepared.mapper.issues),
             rejections=rejections,
             success=not rejections and planned.failed == 0,
             dry_run=dry_run,
@@ -118,7 +118,7 @@ def run_sync_batch(
     try:
         write_result = write_index_records(
             connection,
-            map_result.records,
+            prepared.records,
             commit=False,
         )
         if write_result.failed:
@@ -127,7 +127,7 @@ def run_sync_batch(
             return _sync_result(
                 batch,
                 write_result,
-                mapper_issues=len(map_result.issues),
+                mapper_issues=len(prepared.mapper.issues),
                 rejections=rejections,
                 success=False,
                 dry_run=False,
@@ -135,6 +135,8 @@ def run_sync_batch(
                 checkpoint_advanced=False,
             )
 
+        _persist_ingest_decisions(connection, prepared.decisions)
+        _record_locator_history(connection, prepared.records)
         _update_checkpoint(connection, batch.source_name, batch.cursor)
     except Exception as exc:
         _rollback_savepoint(connection, savepoint)
@@ -142,7 +144,7 @@ def run_sync_batch(
         return _sync_result(
             batch,
             write_result,
-            mapper_issues=len(map_result.issues),
+            mapper_issues=len(prepared.mapper.issues),
             rejections=rejections,
             success=False,
             dry_run=False,
@@ -156,7 +158,7 @@ def run_sync_batch(
     return _sync_result(
         batch,
         write_result,
-        mapper_issues=len(map_result.issues),
+        mapper_issues=len(prepared.mapper.issues),
         rejections=rejections,
         success=True,
         dry_run=False,
@@ -224,6 +226,63 @@ def _update_checkpoint(
         """,
         (source_name, cursor, now, now),
     )
+
+
+def _persist_ingest_decisions(
+    connection: sqlite3.Connection, decisions: tuple[IngestDecision, ...]
+) -> None:
+    """Persist the one decision that downstream extraction must consume."""
+
+    for decision in decisions:
+        connection.execute(
+            """
+            INSERT INTO ingest_decisions (
+              locator_export_id, thread_key, lane, thread_confidence,
+              suppression_action, extraction_eligible, reason_codes,
+              source_state, decided_at, last_seen_at, missing_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'present', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL)
+            ON CONFLICT(locator_export_id) DO UPDATE SET
+              thread_key = excluded.thread_key,
+              lane = excluded.lane,
+              thread_confidence = excluded.thread_confidence,
+              suppression_action = excluded.suppression_action,
+              extraction_eligible = excluded.extraction_eligible,
+              reason_codes = excluded.reason_codes,
+              source_state = 'present',
+              decided_at = CURRENT_TIMESTAMP,
+              last_seen_at = CURRENT_TIMESTAMP,
+              missing_at = NULL
+            """,
+            (
+                decision.locator_export_id,
+                decision.thread_key,
+                decision.lane,
+                decision.confidence,
+                decision.suppression_action,
+                int(decision.extraction_eligible),
+                ",".join(decision.reason_codes),
+            ),
+        )
+
+
+def _record_locator_history(connection: sqlite3.Connection, records: tuple[object, ...]) -> None:
+    """Append-only locator variants preserve moves without deleting history."""
+
+    for record in records:
+        connection.execute(
+            """
+            INSERT OR IGNORE INTO message_locator_history (
+              locator_export_id, account, mailbox, folder_path, locator_uid, source_state
+            ) VALUES (?, ?, ?, ?, ?, 'present')
+            """,
+            (
+                record.locator_export_id,
+                record.locator_account,
+                record.locator_mailbox,
+                record.locator_folder,
+                record.locator_uid,
+            ),
+        )
 
 
 def sync_from_fixture_corpus(
