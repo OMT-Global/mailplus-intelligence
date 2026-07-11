@@ -37,7 +37,54 @@ class FixtureMapperTests(unittest.TestCase):
 
         self.assertEqual(malformed.references, ())
         self.assertIsNone(malformed.in_reply_to)
-        self.assertTrue(any(issue.code == "malformed_reference" for issue in result.issues))
+        issue = next(issue for issue in result.issues if issue.code == "malformed_reference")
+        self.assertFalse(issue.fatal)
+        self.assertIn(issue, result.warnings)
+
+    def test_missing_required_record_is_a_fatal_rejection(self) -> None:
+        message = {
+            "fixture_id": "missing-subject",
+            "message_id": "<missing-subject@example.test>",
+            "from": "alice@example.test",
+            "date": "2026-01-01T00:00:00Z",
+            "mailbox": "Inbox",
+            "folder": "Inbox",
+            "locator": {"uid": "1"},
+        }
+
+        result = map_fixture_messages([message])
+
+        self.assertEqual(result.records, ())
+        self.assertEqual(len(result.rejections), 1)
+        self.assertTrue(result.rejections[0].fatal)
+        self.assertEqual(result.rejections[0].code, "missing_required")
+
+    def test_invalid_attachment_reject_does_not_abort_later_records(self) -> None:
+        invalid = {
+            "fixture_id": "invalid-attachment",
+            "message_id": "<invalid-attachment@example.test>",
+            "subject": "Invalid attachment",
+            "from": "alice@example.test",
+            "date": "2026-01-01T00:00:00Z",
+            "mailbox": "Inbox",
+            "folder": "Inbox",
+            "locator": {"uid": "1"},
+            "attachments": [{"size_bytes": "not-a-number"}],
+        }
+        valid = dict(invalid)
+        valid.update(
+            fixture_id="valid-after-reject",
+            message_id="<valid-after-reject@example.test>",
+            subject="Valid after reject",
+            attachments=[],
+        )
+
+        result = map_fixture_messages([invalid, valid])
+
+        self.assertEqual(len(result.records), 1)
+        self.assertEqual(result.records[0].fixture_id, "valid-after-reject")
+        self.assertEqual(len(result.rejections), 1)
+        self.assertEqual(result.rejections[0].code, "invalid_attachment_metadata")
 
     def test_treats_null_references_as_malformed_optional_value(self) -> None:
         message = {

@@ -30,23 +30,29 @@ Run an offline incremental sync against the fixture corpus.
 python - <<'EOF'
 from mailplus_intelligence.sqlite import connect_sqlite
 from mailplus_intelligence.schema import apply_all_migrations
-from mailplus_intelligence.fixtures import load_metadata_fixture_corpus
-from mailplus_intelligence.mapper import map_fixture_messages
-from mailplus_intelligence.index_writer import write_index_records
+from mailplus_intelligence.sync import sync_from_fixture_corpus
 
 conn = connect_sqlite("mailplus.db")
 apply_all_migrations(conn)
-corpus = load_metadata_fixture_corpus("fixtures/mailplus_metadata")
-result = map_fixture_messages(corpus.messages)
-write_result = write_index_records(conn, result.records)
-print(f"Inserted: {write_result.inserted}  Skipped: {write_result.skipped}  Errors: {write_result.errors}")
+result = sync_from_fixture_corpus(conn, "fixtures/mailplus_metadata")
+print(
+    f"Inserted: {result.inserted}  Updated: {result.updated}  "
+    f"Unchanged: {result.unchanged}  Rejected: {result.rejected}  "
+    f"Failed: {result.failed}"
+)
 conn.close()
 EOF
 ```
 
-Idempotent: re-running skips already-indexed messages (matched by `locator_export_id`).
+Idempotent: re-running reports exact normalized messages as `unchanged`, matched
+only by `locator_export_id`. Changed metadata under that identity is `updated`;
+other constraint collisions are `failed`.
 
-**Checkpoint behavior:** the `sync_checkpoints` table records `source_name`, `cursor`, and `last_success_at`. Update the cursor after each successful batch to support resume.
+**Checkpoint behavior:** the `sync_checkpoints` table records `source_name`,
+`cursor`, and `last_success_at`. Record writes and cursor advancement commit
+atomically only when every input is inserted, updated, or unchanged. Fatal mapper
+rejects are returned as privacy-safe quarantine metadata and retain the prior
+cursor for repair and replay.
 
 ---
 
@@ -70,8 +76,11 @@ DELETE FROM sync_checkpoints WHERE source_name = 'your-source';
 If a sync run is interrupted:
 
 1. The `sync_checkpoints` row retains the last successful cursor.
-2. Re-run the sync job — it will resume from that cursor.
-3. Idempotent writes mean partial progress is safe to replay.
+2. Inspect `rejections` and `write_errors`; correct the source record without
+   copying raw body or attachment content into logs.
+3. Re-run the same batch — atomic rollback means no partial parent or child rows
+   need manual cleanup.
+4. Continue to later cursors only after the repaired batch succeeds.
 
 To inspect checkpoint state:
 
@@ -171,7 +180,9 @@ Review the generated files in `./export-artifacts/` before any live promotion. T
 |---------|--------------|--------|
 | `schema` check fails | Migration not applied | Run `apply_all_migrations()` |
 | `fixtures` check fails | Missing fixture files | Check `fixtures/mailplus_metadata/` |
-| Sync inserts 0 records | All locator_export_ids already present | Normal for idempotent re-run |
+| Sync reports all records unchanged | Exact normalized locator_export_ids already present | Normal for idempotent re-run |
+| Sync reports rejected records | Fatal required metadata or shape error | Repair the quarantined fixture IDs and replay the same cursor |
+| Sync reports failed records | Normalized validation, unrelated constraint, or child write failure | Inspect privacy-safe errors; the data and checkpoint were rolled back |
 | Queue `decide` raises `KeyError` | Artifact ID not in database | Check artifact ID spelling |
 | Export produces 0 artifacts | No approved/corrected items in queue | Approve candidates first |
 

@@ -215,7 +215,9 @@ def cmd_seed(args: argparse.Namespace) -> int:
 
     print(
         "Seeded fixture corpus: "
-        f"inserted={result.inserted}, skipped={result.skipped}, "
+        f"inserted={result.inserted}, updated={result.updated}, "
+        f"unchanged={result.unchanged}, rejected={result.rejected}, "
+        f"failed={result.failed}, "
         f"queued={queued}, queue_skipped={skipped}."
     )
     return 0 if result.success else 1
