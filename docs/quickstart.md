@@ -5,7 +5,7 @@ live MailPlus, IMAP, wiki, memory, or reminder surfaces.
 
 ## Setup
 
-```bash
+```bash setup-prerequisite
 python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .
@@ -13,7 +13,7 @@ python -m pip install -e .
 
 Confirm the local fixture-mode environment:
 
-```bash
+```bash fixture-smoke
 mpi doctor
 ```
 
@@ -26,13 +26,16 @@ MailPlus Intelligence fixture doctor
 - ok: manifest: project.bootstrap.yaml present
 - ok: fixtures: loaded metadata fixture corpus with 8 messages
 - ok: schema: metadata schema user_version=1
-- gated: live-mailplus: live MailPlus credentials intentionally unavailable in fixture mode
+- gated: live-configured: missing required variables: MAILPLUS_HOST, MAILPLUS_USER, MAILPLUS_TOKEN
+- gated: live-reachable: not checked because live configuration is absent
+- gated: live-authenticated: not checked because live configuration is absent
+- gated: live-sync-capable: not available; the live adapter currently returns a stub batch
 result: ok
 ```
 
 For machine-readable output, run:
 
-```bash
+```bash fixture-smoke
 mpi doctor --json
 ```
 
@@ -43,8 +46,8 @@ The JSON response includes `ok` and a `checks` array. Each check has `name`,
 
 Use a file-backed database so queue decisions and sync state persist:
 
-```bash
-mpi --db ./mpi.db seed --from-fixtures fixtures/mailplus_metadata
+```bash fixture-smoke
+mpi seed --db ./mpi.db --from-fixtures fixtures/mailplus_metadata
 ```
 
 Expected shape:
@@ -58,8 +61,8 @@ are skipped when they already exist.
 
 ## Search And Inspect
 
-```bash
-mpi --db ./mpi.db search --keyword Atlas
+```bash fixture-smoke
+mpi search --db ./mpi.db --keyword Atlas
 ```
 
 Expected shape:
@@ -71,8 +74,8 @@ Expected shape:
 
 Inspect the reconstructed thread:
 
-```bash
-mpi --db ./mpi.db thread thread-a
+```bash fixture-smoke
+mpi thread thread-a --db ./mpi.db
 ```
 
 Expected shape:
@@ -86,26 +89,34 @@ Thread: thread-a  (3 messages)
 
 List candidates:
 
-```bash
-mpi --db ./mpi.db queue list
+```bash fixture-smoke
+mpi queue list --db ./mpi.db
 ```
 
 Expected shape:
 
 ```text
-[candidate]  <artifact-id>  thread_summary  thread-a
+[candidate]  <artifact-id>  <artifact-type>  <thread-key>
 ```
 
 Inspect one artifact:
 
-```bash
-mpi --db ./mpi.db queue inspect <artifact-id>
+```bash fixture-smoke
+ARTIFACT_ID="$(
+  mpi queue list --db ./mpi.db --json |
+    python -c 'import json, sys; print(json.load(sys.stdin)[0]["artifact_id"])'
+)"
+mpi queue inspect "$ARTIFACT_ID" --db ./mpi.db
 ```
 
 Approve one artifact:
 
-```bash
-mpi --db ./mpi.db queue approve <artifact-id> \
+```bash fixture-smoke
+ARTIFACT_ID="$(
+  mpi queue list --db ./mpi.db --json |
+    python -c 'import json, sys; print(json.load(sys.stdin)[0]["artifact_id"])'
+)"
+mpi queue approve "$ARTIFACT_ID" --db ./mpi.db \
   --reviewer operator@example.test --expected-revision 0 \
   --notes "Looks correct from fixture metadata"
 ```
@@ -113,16 +124,20 @@ mpi --db ./mpi.db queue approve <artifact-id> \
 `queue inspect` prints the current revision. Reusing an older revision fails
 closed. Review immutable decision history with:
 
-```bash
-mpi --db ./mpi.db queue history <artifact-id>
+```bash fixture-smoke
+ARTIFACT_ID="$(
+  mpi queue list --db ./mpi.db --json |
+    python -c 'import json, sys; print(json.load(sys.stdin)[0]["artifact_id"])'
+)"
+mpi --db ./mpi.db queue history "$ARTIFACT_ID"
 ```
 
 ## Dry-Run Export
 
 Export approved or corrected candidates into inspectable files:
 
-```bash
-mpi --db ./mpi.db export --output ./out
+```bash fixture-smoke
+mpi export --db ./mpi.db --output ./out
 ```
 
 Expected shape:

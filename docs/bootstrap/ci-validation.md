@@ -16,6 +16,8 @@ The fast lane currently checks:
 
 - Python 3.12 runtime availability.
 - Repository secret patterns through `scripts/check-detect-secrets.sh --all-files`.
+- Every `bash fixture-smoke` command block in `docs/quickstart.md` and
+  `docs/ops-runbooks.md`, executed verbatim in an isolated temporary workspace.
 - Unit tests with `PYTHONPATH=src python -m unittest discover -s tests -v`.
 
 ## Extended validation

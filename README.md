@@ -84,10 +84,10 @@ dry-run exporters, scheduler locks, CLI inspection, and `mpi doctor`.
 
 - Live MailPlus/IMAP ingestion is not connected yet. The public adapter shape
   is documented in [the live MailPlus adapter guide](docs/integration/live-mailplus-adapter.md)
-  and tracked for Phase 2 in [issue #75](https://github.com/OMT-Global/mailplus-intelligence/issues/75).
+  as `contract-only` and tracked in [issue #106](https://github.com/OMT-Global/mailplus-intelligence/issues/106).
 - Production export to wiki, `memory/`, or reminders is dry-run only. The
   future live export contract is documented in [the live export guide](docs/integration/live-export.md)
-  and tracked for Phase 2 in [issue #75](https://github.com/OMT-Global/mailplus-intelligence/issues/75).
+  and deferred by the roadmap in [issue #98](https://github.com/OMT-Global/mailplus-intelligence/issues/98).
 
 ## What should not go into memory
 
@@ -138,9 +138,9 @@ Run the fast unit-test baseline:
 bash scripts/ci/run-fast-checks.sh
 ```
 
-## Phase 1 goals
+## Read-only alpha goals
 
-Phase 1 should support practical operator questions like:
+The read-only alpha should support practical operator questions like:
 
 - What’s my history with this person?
 - Did I already commit to this?
@@ -150,8 +150,8 @@ Phase 1 should support practical operator questions like:
 
 The v0.1 public-release blockers are tracked with the
 [`release-v0.1` label](https://github.com/OMT-Global/mailplus-intelligence/issues?q=is%3Aissue+is%3Aopen+label%3Arelease-v0.1).
-Phase 2 live integration work is tracked in
-[issue #75](https://github.com/OMT-Global/mailplus-intelligence/issues/75).
+Live integration and its dependency order are tracked in
+[issue #98](https://github.com/OMT-Global/mailplus-intelligence/issues/98).
 
 Primary epics include:
 
@@ -162,7 +162,7 @@ Primary epics include:
 - classification lanes
 - semantic extraction
 - memory/wiki promotion
-- phase-1 medium-architecture delivery
+- read-only single-account delivery
 
 Release history is tracked in [CHANGELOG.md](CHANGELOG.md), and versioning
 policy is documented in [docs/versioning.md](docs/versioning.md).

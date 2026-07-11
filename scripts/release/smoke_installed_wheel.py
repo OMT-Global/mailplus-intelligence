@@ -83,8 +83,8 @@ def smoke_wheel(wheel: Path, project_root: Path, expected_version: str) -> None:
                 version = current_schema_version(connection)
             finally:
                 connection.close()
-            if version != 3:
-                raise SystemExit(f"expected schema user_version=3, got {version}")
+            if version != 4:
+                raise SystemExit(f"expected schema user_version=4, got {version}")
             print(f"schema user_version={version}")
             """
         )
@@ -133,6 +133,7 @@ def smoke_wheel(wheel: Path, project_root: Path, expected_version: str) -> None:
         if not queue_items:
             raise SmokeFailure("fixture seed produced an empty review queue")
         artifact_id = str(queue_items[0]["artifact_id"])
+        expected_revision = str(queue_items[0]["revision"])
         print(f"queue contains {len(queue_items)} candidate(s)")
 
         _run(
@@ -147,6 +148,10 @@ def smoke_wheel(wheel: Path, project_root: Path, expected_version: str) -> None:
                 "queue",
                 "approve",
                 artifact_id,
+                "--reviewer",
+                "installed-wheel-smoke",
+                "--expected-revision",
+                expected_revision,
                 "--notes",
                 "installed-wheel smoke approval",
             ],
@@ -172,7 +177,7 @@ def smoke_wheel(wheel: Path, project_root: Path, expected_version: str) -> None:
 
         print(
             f"installed-wheel smoke passed: {wheel.name}; "
-            f"schema=3, search={len(search_results)}, queue={len(queue_items)}, "
+            f"schema=4, search={len(search_results)}, queue={len(queue_items)}, "
             f"exports={manifest['artifact_count']}"
         )
 

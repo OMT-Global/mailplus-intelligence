@@ -12,6 +12,7 @@ assert_contains() {
 }
 
 assert_contains scripts/ci/run-fast-checks.sh "scripts/check-detect-secrets.sh --all-files"
+assert_contains scripts/ci/run-fast-checks.sh "scripts/ci/docs_smoke.py"
 assert_contains scripts/ci/run-fast-checks.sh "-m unittest discover -s tests -v"
 assert_contains scripts/ci/run-extended-validation.sh "bash scripts/ci/run-fast-checks.sh"
 assert_contains scripts/ci/run-extended-validation.sh "scripts/evaluate.py"

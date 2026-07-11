@@ -1,8 +1,9 @@
-# Live MailPlus Adapter Integration
+# Live MailPlus Adapter Contract
 
-The live adapter is v0.2 territory. v0.1 ships the stable boundary and fixture
-mode, but `_fetch_messages()` intentionally returns an empty batch until a real
-MailPlus or IMAP client is wired in.
+The live adapter is `contract-only`. Fixture mode exercises its public boundary,
+but `_fetch_messages()` intentionally returns an empty batch until issue #106
+wires a real read-only MailPlus or IMAP transport. It is not integrated or
+production-verified.
 
 ## Expected Configuration
 
@@ -19,14 +20,21 @@ MailPlus or IMAP client is wired in.
 Missing required values raise `LiveAdapterNotConfigured`; fixture-mode tests
 should continue to treat that as a gated state, not a failure.
 
+The runtime reads the invoking process environment only. It does not load
+dotenv or other configuration files. `.env.example` documents canonical names,
+but operators must export or process-inject values explicitly.
+
 ## SyncBatch Shape
 
 Live ingestion must return the same `SyncBatch` shape as fixture ingestion:
 
-- `source_name`: stable source identifier such as `mailplus:<user>`
-- `cursor`: previous cursor supplied by the scheduler or checkpoint
-- `next_cursor`: cursor for the next incremental sync
-- `messages`: list of metadata-only message dictionaries
+- `source_name`: stable source identifier such as `live:<user>`
+- `cursor`: checkpoint to commit after this batch succeeds
+- `messages`: tuple of metadata-only message dictionaries
+
+The adapter function may accept the prior checkpoint as an input parameter, but
+`SyncBatch` has no `next_cursor` field. Its `cursor` value is the next checkpoint
+that `run_sync_batch()` records only after the batch succeeds.
 
 Each message should include source account/mailbox/folder, stable UID, message
 ID, references/in-reply-to headers when present, sender/recipients, subject,
@@ -59,11 +67,11 @@ def fetch_imap_metadata(config: LiveAdapterConfig, cursor: str = "") -> SyncBatc
             "attachments": [],
         }
     ]
+    next_checkpoint = messages[-1]["locator"]["uid"] if messages else cursor
     return SyncBatch(
-        source_name=f"mailplus:{config.user}",
-        cursor=cursor,
-        next_cursor="123",
-        messages=messages,
+        source_name=f"live:{config.user}",
+        cursor=next_checkpoint,
+        messages=tuple(messages),
     )
 ```
 

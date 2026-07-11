@@ -16,6 +16,7 @@ REQUIRED_MIGRATIONS = (
     "001_metadata_schema_v0.sql",
     "002_attachment_metadata.sql",
     "003_cache_and_queue.sql",
+    "004_semantic_provenance_review.sql",
 )
 VALIDATOR = Path(__file__).resolve().parents[1] / "scripts" / "release" / "validate_artifacts.py"
 
@@ -73,7 +74,7 @@ class ReleaseArtifactValidationTests(unittest.TestCase):
 
                     self.assertNotEqual(completed.returncode, 0)
                     self.assertIn("missing required migration resources", completed.stderr)
-                    self.assertIn("003_cache_and_queue.sql", completed.stderr)
+                    self.assertIn("004_semantic_provenance_review.sql", completed.stderr)
 
 
 if __name__ == "__main__":

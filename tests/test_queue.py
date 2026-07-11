@@ -6,6 +6,7 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from importlib import resources
 from pathlib import Path
 
 from mailplus_intelligence.queue import (
@@ -19,7 +20,6 @@ from mailplus_intelligence.queue import (
     get_review_history,
 )
 from mailplus_intelligence.schema import (
-    MIGRATIONS_DIR,
     apply_all_migrations,
     current_schema_version,
 )
@@ -338,7 +338,12 @@ class LegacyQueueMigrationTests(unittest.TestCase):
                 "002_attachment_metadata.sql",
                 "003_cache_and_queue.sql",
             ):
-                connection.executescript((MIGRATIONS_DIR / filename).read_text())
+                migration = (
+                    resources.files("mailplus_intelligence")
+                    .joinpath("migrations")
+                    .joinpath(filename)
+                )
+                connection.executescript(migration.read_text(encoding="utf-8"))
             connection.execute(
                 """
                 INSERT INTO promotion_queue (
