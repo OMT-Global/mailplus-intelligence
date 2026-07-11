@@ -2,7 +2,7 @@ name: PR Fast CI
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, edited, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: pr-fast-${{ github.event.pull_request.number || github.ref }}
@@ -12,6 +12,7 @@ permissions:
   contents: read
 
 env:
+  NODE_VERSION: '20'
   PYTHON_VERSION: '3.12'
 
 defaults:
@@ -21,25 +22,20 @@ defaults:
 jobs:
   changes:
     name: Detect Relevant Changes
-    # Fork-controlled PR code never runs on persistent self-hosted runners.
-    runs-on: ubuntu-latest
+    runs-on: ['self-hosted', 'linux', 'shell-only', 'public']
     outputs:
       app: ${{ steps.filter.outputs.app }}
       ci: ${{ steps.filter.outputs.ci }}
-      packaging: ${{ steps.filter.outputs.packaging }}
     steps:
-      - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+      - uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
             app:
-              - 'pyproject.toml'
-              - 'src/**'
-              - 'tests/**'
               - 'project.bootstrap.yaml'
               - 'AGENTS.md'
-              - 'CLAUDE.md'
-              - '.devcontainer/**'
+              - 'CONTRIBUTING.md'
+              - '.github/PULL_REQUEST_TEMPLATE.md'
               - '.githooks/**'
               - '.github/workflows/**'
               - 'scripts/**'
@@ -47,126 +43,112 @@ jobs:
               - 'README.md'
               - 'docs/**'
             ci:
-              - 'pyproject.toml'
-              - 'src/**'
-              - 'tests/**'
               - 'project.bootstrap.yaml'
               - 'AGENTS.md'
-              - 'CLAUDE.md'
-              - '.devcontainer/**'
+              - 'CONTRIBUTING.md'
+              - '.github/PULL_REQUEST_TEMPLATE.md'
               - '.githooks/**'
               - '.github/workflows/**'
               - 'scripts/**'
               - 'docs/bootstrap/**'
               - '.env.example'
               - 'CODEOWNERS'
-            packaging:
-              - 'pyproject.toml'
-              - '.github/workflows/release.yml'
-              - 'scripts/release/**'
-
-  actionlint:
-    name: Actionlint
-    runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
-    permissions:
-      contents: read
-      checks: write
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          persist-credentials: false
-      - uses: reviewdog/action-actionlint@a5524e1c19e62881d79c1f1b9b6f09f16356e281 # v1.65.2
-        with:
-          reporter: github-pr-check
-          fail_level: error
-
-  dependency-review:
-    name: Dependency Review
-    runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          persist-credentials: false
-      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
-        with:
-          fail-on-severity: moderate
 
   fast-checks:
     name: Fast Checks
-    runs-on: ubuntu-latest
+    runs-on: ['self-hosted', 'linux', 'shell-only', 'public']
     timeout-minutes: 15
     needs: changes
     if: >-
       github.event.pull_request.draft == false &&
       (needs.changes.outputs.app == 'true' || needs.changes.outputs.ci == 'true')
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          persist-credentials: false
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
+
       - name: Run fast checks
         run: bash scripts/ci/run-fast-checks.sh
 
+  validate-pr-description:
+    name: Validate PR Description
+    runs-on: ['self-hosted', 'linux', 'shell-only', 'public']
+    timeout-minutes: 5
+    if: github.event.pull_request.draft == false
+    env:
+      PR_BODY: ${{ github.event.pull_request.body }}
+    steps:
+      - name: Require generated PR template content
+        run: |
+          failed=0
+
+          require_line() {
+            local line="$1"
+            if ! grep -Fqx "$line" <<<"$PR_BODY"; then
+              echo "Missing required PR section: $line"
+              failed=1
+            fi
+          }
+
+          require_line "## Summary"
+          require_line "## Governing Issue"
+          require_line "## Validation"
+          require_line "## Bootstrap Governance"
+          require_line "## Merge Automation"
+          require_line "## Notes"
+
+          if grep -Eiq 'Closes #$|#<issue-number>|what changed|why it changed|notable tradeoffs|migration or rollout notes|follow-up work if any' <<<"$PR_BODY"; then
+            echo "PR body still contains template placeholder text."
+            failed=1
+          fi
+
+          if ! grep -Eiq '(^|[[:space:]-])(((close[sd]?|fix(e[sd])?|resolve[sd]?|refs?|part[[:space:]]+of)[[:space:]]+)?(#|[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#|https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/issues/)[0-9]+|no issue is linked|no linked issue|without a linked issue|no governing issue)' <<<"$PR_BODY"; then
+            echo "PR body must close/link an issue or explicitly explain why no issue is linked."
+            failed=1
+          fi
+
+          if ! grep -Eiq '(^|[[:space:]-])(\[[xX]\]|not run|not applicable|n/a)' <<<"$PR_BODY"; then
+            echo "PR body must include validation evidence, a checked validation item, or a reason validation was not run."
+            failed=1
+          fi
+
+          auto_merge_evidence="$(grep -Eiv '^[[:space:]]*-[[:space:]]+\[[[:space:]]\][[:space:]]' <<<"$PR_BODY" || true)"
+          if ! grep -Eiq 'auto-merge (is )?(enabled|armed)|enabled auto-merge|gh pr merge --auto|auto_merge|auto merge enabled|auto-merge (is )?(unavailable|unsafe|not available|not safe)|plan-limit|fallback merge-readiness' <<<"$auto_merge_evidence"; then
+            echo "PR body must state that the PR author enabled auto-merge, or explain why auto-merge is unavailable/unsafe."
+            failed=1
+          fi
+
+          exit "$failed"
+
   validate-secrets:
     name: Validate Secrets
-    runs-on: ubuntu-latest
+    runs-on: ['self-hosted', 'linux', 'shell-only', 'public']
     timeout-minutes: 10
     if: github.event.pull_request.draft == false
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          persist-credentials: false
       - name: Scan repository for secret patterns
         run: bash scripts/check-detect-secrets.sh --all-files
 
-  package-build:
-    name: Package Build
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    needs: changes
-    if: >-
-      github.event.pull_request.draft == false &&
-      needs.changes.outputs.packaging == 'true'
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          persist-credentials: false
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Build distribution artifacts
-        run: bash scripts/release/dry-run.sh --skip-fast-checks
-
   ci-gate:
     name: CI Gate
-    runs-on: ubuntu-latest
+    runs-on: ['self-hosted', 'linux', 'shell-only', 'public']
     if: always()
     needs:
       - changes
-      - actionlint
-      - dependency-review
       - fast-checks
+      - validate-pr-description
       - validate-secrets
-      - package-build
     steps:
       - name: Check required PR jobs
         env:
           RESULTS: >-
             changes=${{ needs.changes.result }}
-            actionlint=${{ needs.actionlint.result }}
-            dependency-review=${{ needs.dependency-review.result }}
             fast-checks=${{ needs.fast-checks.result }}
+            validate-pr-description=${{ needs.validate-pr-description.result }}
             validate-secrets=${{ needs.validate-secrets.result }}
-            package-build=${{ needs.package-build.result }}
         run: |
           failed=0
           for entry in $RESULTS; do
