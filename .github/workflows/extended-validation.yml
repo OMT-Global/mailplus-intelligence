@@ -25,13 +25,13 @@ defaults:
 jobs:
   changes:
     name: Detect Extended Validation Scope
-    runs-on: ['self-hosted', 'linux', 'shell-only', 'public']
+    runs-on: ['self-hosted', 'synology', 'shell-only', 'private']
     outputs:
       app: ${{ steps.preset.outputs.app || steps.filter.outputs.app || 'false' }}
       ci: ${{ steps.preset.outputs.ci || steps.filter.outputs.ci || 'false' }}
       extended: ${{ steps.preset.outputs.extended || steps.filter.outputs.extended || 'false' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         if: github.event_name == 'push'
         with:
           fetch-depth: 0
@@ -46,7 +46,7 @@ jobs:
           extended=true
           EOF
 
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
         id: filter
         if: github.event_name == 'push'
         with:
@@ -54,10 +54,14 @@ jobs:
             app:
               - 'project.bootstrap.yaml'
               - 'AGENTS.md'
-              - 'CONTRIBUTING.md'
-              - '.github/PULL_REQUEST_TEMPLATE.md'
+              - 'CLAUDE.md'
+              - '.devcontainer/**'
               - '.githooks/**'
               - '.github/workflows/**'
+              - 'pyproject.toml'
+              - 'src/**'
+              - 'tests/**'
+              - 'fixtures/**'
               - 'scripts/**'
               - 'docs/bootstrap/**'
               - 'README.md'
@@ -65,8 +69,8 @@ jobs:
             ci:
               - 'project.bootstrap.yaml'
               - 'AGENTS.md'
-              - 'CONTRIBUTING.md'
-              - '.github/PULL_REQUEST_TEMPLATE.md'
+              - 'CLAUDE.md'
+              - '.devcontainer/**'
               - '.githooks/**'
               - '.github/workflows/**'
               - 'scripts/**'
@@ -79,40 +83,40 @@ jobs:
 
   fast-checks:
     name: Fast Checks
-    runs-on: ['self-hosted', 'linux', 'shell-only', 'public']
+    runs-on: ['self-hosted', 'synology', 'shell-only', 'private']
     timeout-minutes: 15
     needs: changes
     if: needs.changes.outputs.app == 'true' || needs.changes.outputs.ci == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Run fast checks
         run: bash scripts/ci/run-fast-checks.sh
 
   extended-checks:
     name: Extended Checks
-    runs-on: ['self-hosted', 'linux', 'shell-only', 'public']
+    runs-on: ['self-hosted', 'synology', 'shell-only', 'private']
     timeout-minutes: 20
     needs: changes
     if: needs.changes.outputs.extended == 'true' || needs.changes.outputs.app == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Run extended validation
         run: bash scripts/ci/run-extended-validation.sh
 
   validate-secrets:
     name: Validate Secrets
-    runs-on: ['self-hosted', 'linux', 'shell-only', 'public']
+    runs-on: ['self-hosted', 'synology', 'shell-only', 'private']
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Scan repository for secret patterns
         run: bash scripts/check-detect-secrets.sh --all-files
 
   extended-validation-gate:
     name: Extended Validation Gate
-    runs-on: ['self-hosted', 'linux', 'shell-only', 'public']
+    runs-on: ['self-hosted', 'synology', 'shell-only', 'private']
     if: always()
     needs:
       - changes
