@@ -5,8 +5,10 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from mailplus_intelligence.cli import build_parser, main
@@ -46,6 +48,16 @@ class CLIParserTests(unittest.TestCase):
     def test_search_subcommand_no_results_memory_db(self):
         rc = main(["--db", ":memory:", "search", "--keyword", "Atlas"])
         self.assertEqual(rc, 0)
+
+    @mock.patch.dict(os.environ, {}, clear=True)
+    def test_live_sync_requires_explicit_configuration_without_network_access(self):
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            rc = main(["--json", "sync", "run", "--dry-run"])
+        self.assertEqual(rc, 2)
+        payload = json.loads(err.getvalue())
+        self.assertIn("MAILPLUS_HOST", payload["error"])
+        self.assertNotIn("synthetic-secret", payload["error"])
 
     def test_no_subcommand_returns_nonzero(self):
         rc = main([])
