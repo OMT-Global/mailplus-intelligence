@@ -70,6 +70,24 @@ Audit events should preserve enough metadata to answer:
 Audit entries should link to MailPlus or fixture locators instead of copying raw
 mail text.
 
+## Selected-Text Disposal
+
+Expired selected text is overwritten in the active SQLite row and represented by
+a privacy-safe tombstone plus append-only lifecycle events. Operators should
+verify that active rows no longer contain `cached_text`, but must account for
+SQLite WAL files, backups, filesystem snapshots, and storage-layer copies when
+describing the larger retention boundary. Database, `-wal`, and `-shm` files are
+restricted to owner-only permissions where the process can reach them. Backup
+retention and snapshot destruction remain operator responsibilities.
+
+Schedule `run_cache_disposal_job()` as part of the recurring local maintenance
+loop. Its lock name is `selected-text-cache-disposal`; each run atomically
+overwrites all expired selected text and records expiry/disposal events.
+
+Do not log cache rows or model payloads while diagnosing expiry or egress
+failures. Use event types, reason codes, keyed thread references, provider/model
+labels, and declared data classes instead.
+
 ## Stale Run Detection
 
 Recurring or manual jobs should report a stale state when expected checkpoints do

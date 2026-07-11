@@ -176,6 +176,42 @@ Operational rule:
 
 When a failure needs payload-level inspection, reproduce it with a synthetic fixture or inspect the raw source in MailPlus under operator control. Do not promote payload dumps into logs.
 
+## Model Provider And Egress Policy
+
+Model use is fail-closed. `MAILPLUS_LLM_PROVIDER_MODE` defaults to `disabled` and
+must be set explicitly to `local` or `cloud` for a non-cassette request. Cloud
+mode additionally requires `MAILPLUS_LLM_CLOUD_OPT_IN=true`; setting a model name
+or API key alone does not authorize egress. Cloud mode also requires
+`MAILPLUS_LLM_PSEUDONYMIZATION_KEY` from an approved secret store; that key is
+at least 32 UTF-8 bytes, is used only to derive non-reversible request
+pseudonyms, and is never persisted.
+
+Every request declares data classes allowed by the provider policy. The cloud
+default is only `metadata-redacted`. Sender, subject, folder, date, and thread identity
+are keyed-pseudonymized before a cloud request, and policy cannot disable that
+minimization. A task that genuinely needs a broader data class must receive a
+separate explicit policy change and privacy review; it must not reuse the
+metadata-only path implicitly.
+
+Non-cassette requests require a clean, file-backed audit connection; in-memory
+databases and connections with an active caller transaction fail closed. The
+authorized policy is bound to the selected client mode/provider before any
+request. Audit rows contain a request ID, keyed thread reference, provider
+mode/name, model, declared data classes, status, and timestamp. They do not contain prompts, responses, sender values,
+subjects, folders, selected text, credentials, or API keys. Cassette playback is
+local synthetic test behavior and performs no provider egress.
+
+Example cloud opt-in (credentials remain in the process environment or an
+approved secret store, never in a file committed to this repository):
+
+```bash
+export MAILPLUS_LLM_PROVIDER_MODE=cloud
+export MAILPLUS_LLM_PROVIDER=anthropic
+export MAILPLUS_LLM_DATA_CLASSES=metadata-redacted
+export MAILPLUS_LLM_CLOUD_OPT_IN=true
+export MAILPLUS_LLM_PSEUDONYMIZATION_KEY=[FROM_APPROVED_SECRET_STORE]
+```
+
 ## Promotion Review Checklist
 
 Before moving anything from selected text cache or semantic output into durable memory, confirm:

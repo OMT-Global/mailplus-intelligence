@@ -11,6 +11,7 @@ _MIGRATIONS = [
     "002_attachment_metadata.sql",
     "003_cache_and_queue.sql",
     "004_semantic_provenance_review.sql",
+    "005_cache_privacy.sql",
 ]
 
 
