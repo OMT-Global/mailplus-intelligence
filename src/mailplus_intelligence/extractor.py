@@ -8,10 +8,11 @@ Outputs conform to the semantic artifact contract (semantic_contract.py).
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
 from .classifier import ClassificationResult, classify_metadata
+from .semantic_contract import SemanticArtifact
 from .threading import ReconstructedThread
 
 
@@ -51,21 +52,12 @@ EVENT_SUBJECT_TOKENS = (
     "settlement",
 )
 
+DETERMINISTIC_EXTRACTOR_VERSION = "metadata-extractor-v1"
+DETERMINISTIC_RULE_VERSION = "metadata-rules-v1"
 
-@dataclass(frozen=True)
-class ExtractionCandidate:
-    """A single deterministic extraction candidate conforming to the semantic contract."""
-
-    artifact_id: str
-    artifact_type: str
-    source_thread_key: str
-    source_message_ids: tuple[str, ...]
-    source_locators: tuple[str, ...]
-    evidence_refs: tuple[str, ...]
-    summary: str
-    confidence: str
-    review_status: str
-    provenance: str
+# Retain the public name while making every extraction result use the single
+# canonical immutable envelope.
+ExtractionCandidate = SemanticArtifact
 
 
 def extract_from_thread(
@@ -158,6 +150,10 @@ def _build_thread_summary(
         confidence="high" if thread.confidence == "high" else "medium",
         review_status="candidate",
         provenance="deterministic",
+        extractor_version=DETERMINISTIC_EXTRACTOR_VERSION,
+        model_version=None,
+        rule_version=DETERMINISTIC_RULE_VERSION,
+        created_at=_utc_now(),
     )
 
 
@@ -181,6 +177,10 @@ def _try_obligation(
                 confidence="low",
                 review_status="review_needed",
                 provenance="deterministic",
+                extractor_version=DETERMINISTIC_EXTRACTOR_VERSION,
+                model_version=None,
+                rule_version=DETERMINISTIC_RULE_VERSION,
+                created_at=_utc_now(),
             )
     return None
 
@@ -207,5 +207,13 @@ def _try_event(
                 confidence="medium",
                 review_status="candidate",
                 provenance="deterministic",
+                extractor_version=DETERMINISTIC_EXTRACTOR_VERSION,
+                model_version=None,
+                rule_version=DETERMINISTIC_RULE_VERSION,
+                created_at=_utc_now(),
             )
     return None
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()

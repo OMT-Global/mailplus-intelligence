@@ -13,7 +13,7 @@ from mailplus_intelligence.cli import build_parser, main
 from mailplus_intelligence.fixtures import load_metadata_fixture_corpus
 from mailplus_intelligence.index_writer import write_index_records
 from mailplus_intelligence.mapper import map_fixture_messages
-from mailplus_intelligence.queue import enqueue_candidate, decide
+from mailplus_intelligence.queue import enqueue_candidate, get_item, get_review_history
 from mailplus_intelligence.schema import apply_all_migrations
 from mailplus_intelligence.sqlite import connect_sqlite
 
@@ -103,10 +103,17 @@ class CLIQueueTests(unittest.TestCase):
         self.artifact_id = enqueue_candidate(self.conn, {
             "artifact_type": "obligation",
             "source_thread_key": "thread-a",
+            "source_message_ids": ["<fixture-message-001@example.test>"],
             "source_locators": ["fixture-export-001"],
-            "evidence_refs": ["fixture-export-001"],
+            "evidence_refs": ["subject"],
             "summary": "Test obligation summary.",
             "confidence": "high",
+            "review_status": "candidate",
+            "provenance": "deterministic",
+            "extractor_version": "metadata-extractor-v1",
+            "model_version": None,
+            "rule_version": "metadata-rules-v1",
+            "created_at": "2026-01-10T10:00:00Z",
         })
 
     def tearDown(self):
@@ -115,6 +122,52 @@ class CLIQueueTests(unittest.TestCase):
     def test_queue_list_subcommand(self):
         rc = main(["--db", ":memory:", "queue", "list"])
         self.assertEqual(rc, 0)
+
+    def test_queue_decision_records_reviewer_and_rejects_stale_revision(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            database = str(Path(tmp) / "review.db")
+            connection = connect_sqlite(database)
+            apply_all_migrations(connection)
+            artifact_id = enqueue_candidate(connection, {
+                "artifact_type": "obligation",
+                "source_thread_key": "thread-cli",
+                "source_message_ids": ["<cli@example.test>"],
+                "source_locators": ["fixture-export-cli"],
+                "evidence_refs": ["subject"],
+                "summary": "CLI review candidate.",
+                "confidence": "high",
+                "review_status": "candidate",
+                "provenance": "deterministic",
+                "extractor_version": "metadata-extractor-v1",
+                "model_version": None,
+                "rule_version": "metadata-rules-v1",
+                "created_at": "2026-01-10T10:00:00Z",
+            })
+            connection.close()
+
+            rc = main([
+                "--db", database, "queue", "approve", artifact_id,
+                "--reviewer", "operator@example.test",
+                "--expected-revision", "0",
+            ])
+            self.assertEqual(rc, 0)
+
+            connection = connect_sqlite(database)
+            item = get_item(connection, artifact_id)
+            history = get_review_history(connection, artifact_id)
+            connection.close()
+            self.assertEqual(item.revision, 1)
+            self.assertEqual(history[0].reviewer_identity, "operator@example.test")
+
+            error = io.StringIO()
+            with contextlib.redirect_stderr(error):
+                rc = main([
+                    "--db", database, "queue", "reject", artifact_id,
+                    "--reviewer", "second@example.test",
+                    "--expected-revision", "0",
+                ])
+            self.assertEqual(rc, 2)
+            self.assertIn("stale review", error.getvalue())
 
 
 class CLIExportTests(unittest.TestCase):

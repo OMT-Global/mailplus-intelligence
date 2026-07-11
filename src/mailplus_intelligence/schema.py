@@ -10,6 +10,7 @@ _MIGRATIONS = [
     "001_metadata_schema_v0.sql",
     "002_attachment_metadata.sql",
     "003_cache_and_queue.sql",
+    "004_semantic_provenance_review.sql",
 ]
 
 
