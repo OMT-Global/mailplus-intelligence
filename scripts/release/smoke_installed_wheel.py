@@ -83,8 +83,8 @@ def smoke_wheel(wheel: Path, project_root: Path, expected_version: str) -> None:
                 version = current_schema_version(connection)
             finally:
                 connection.close()
-            if version != 3:
-                raise SystemExit(f"expected schema user_version=3, got {version}")
+            if version != 4:
+                raise SystemExit(f"expected schema user_version=4, got {version}")
             print(f"schema user_version={version}")
             """
         )
