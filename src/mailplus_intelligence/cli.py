@@ -162,14 +162,20 @@ def cmd_search(args: argparse.Namespace) -> int:
         results = search_messages(
             conn,
             sender=args.sender,
+            correspondent=args.correspondent,
+            recipient=args.recipient,
             subject_keyword=args.keyword,
             folder=args.folder,
+            mailbox=args.mailbox,
+            label=args.label,
+            flag=args.flag,
             has_attachments=True if args.has_attachments else None,
             attachment_name_contains=args.attachment_name,
             attachment_mime_type=args.attachment_type,
             date_from=args.date_from,
             date_to=args.date_to,
             thread_key=args.thread,
+            cursor=args.cursor,
             limit=args.limit,
         )
     finally:
@@ -184,6 +190,25 @@ def cmd_search(args: argparse.Namespace) -> int:
         for row in results:
             print(f"{row.get('sent_at','?')}  {row.get('message_id','?')}  {row.get('subject','?')}")
             print(f"  locator: {row.get('locator_export_id','?')} / uid={row.get('locator_uid','?')}")
+    return 0
+
+
+def cmd_history(args: argparse.Namespace) -> int:
+    from .index_writer import search_messages
+
+    conn = _setup_db(args.db)
+    try:
+        results = search_messages(conn, correspondent=args.correspondent, limit=args.limit)
+    finally:
+        conn.close()
+    if args.json:
+        print(json.dumps(results, indent=2))
+    elif not results:
+        print("No history found.")
+    else:
+        for row in reversed(results):
+            print(f"{row['sent_at']}  [{row.get('thread_key', '?')}]  {row['subject']}")
+            print(f"  locator: {row['locator_export_id']} / uid={row['locator_uid']}")
     return 0
 
 
@@ -489,15 +514,25 @@ def build_parser() -> argparse.ArgumentParser:
     # search
     sp = sub.add_parser("search", help="Search indexed messages")
     sp.add_argument("--sender", help="Filter by sender email substring")
+    sp.add_argument("--correspondent", help="Match any participant address or domain")
+    sp.add_argument("--recipient", help="Match a to/cc/bcc participant")
     sp.add_argument("--keyword", help="Filter by subject keyword")
     sp.add_argument("--folder", help="Filter by folder path substring")
+    sp.add_argument("--mailbox", help="Filter by mailbox name")
+    sp.add_argument("--label", help="Filter by exact label")
+    sp.add_argument("--flag", help="Filter by exact flag")
     sp.add_argument("--has-attachments", action="store_true", default=None)
     sp.add_argument("--attachment-name", dest="attachment_name", help="Attachment filename contains")
     sp.add_argument("--attachment-type", dest="attachment_type", help="Attachment MIME type (exact)")
     sp.add_argument("--date-from", dest="date_from", help="Sent on or after (ISO 8601)")
     sp.add_argument("--date-to", dest="date_to", help="Sent on or before (ISO 8601)")
     sp.add_argument("--thread", help="Filter by thread key")
+    sp.add_argument("--cursor", help="Continue after a result cursor")
     sp.add_argument("--limit", type=int, default=50)
+
+    hp = sub.add_parser("history", help="Show metadata-only correspondence history")
+    hp.add_argument("correspondent")
+    hp.add_argument("--limit", type=int, default=100)
 
     # thread
     tp = sub.add_parser("thread", help="Inspect a reconstructed thread")
@@ -584,6 +619,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "search":
             return cmd_search(args)
+        elif args.command == "history":
+            return cmd_history(args)
         elif args.command == "thread":
             return cmd_thread(args)
         elif args.command == "queue":

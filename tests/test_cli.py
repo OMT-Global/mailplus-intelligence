@@ -205,6 +205,13 @@ class CLISearchTests(unittest.TestCase):
         self.assertEqual(rc, 1)
         self.assertFalse(json.loads(err.getvalue())["ok"])
 
+    def test_history_subcommand_returns_metadata_only_timeline(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            rc = main(["--db", self.tmp.name, "history", "alice@example.test"])
+        self.assertEqual(rc, 0)
+        self.assertIn("locator:", out.getvalue())
+
 
 class CLIQueueTests(unittest.TestCase):
     def setUp(self):
