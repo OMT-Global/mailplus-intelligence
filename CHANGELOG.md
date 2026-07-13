@@ -7,10 +7,11 @@ policy in [docs/versioning.md](docs/versioning.md).
 
 ## [Unreleased]
 
-- Publication of the prepared v0.1.1 patch remains gated on the other Phase A
-  release blockers tracked by issue #98.
+- The Phase A release gates tracked by issue #98 are complete. `v0.1.1` is
+  ready to be tagged from the current release-preparation commit; the release
+  workflow will build the artifacts and publish the GitHub release.
 
-## [0.1.1] - 2026-07-10 (proposed)
+## [0.1.1] - 2026-07-12
 
 ### Fixed
 
@@ -27,8 +28,9 @@ policy in [docs/versioning.md](docs/versioning.md).
 
 ### Release status
 
-- The proposed release tag is `v0.1.1`. It has not been published and remains
-  blocked on the other Phase A issues linked from #98.
+- The release tag is `v0.1.1`. It has not yet been published; create the
+  immutable tag from the release-preparation merge commit to trigger the
+  GitHub Release workflow.
 - This patch supersedes the unusable `v0.1.0` artifact history without moving or
   deleting the public `v0.1.0` tag.
 
