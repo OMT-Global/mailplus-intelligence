@@ -169,6 +169,8 @@ github:
     dependabot: true
     secretScanningHints: true
 ci:
+  codeqlLanguages:
+    - python
   policy: experimental
   runnerPolicy: hybrid-safe
   nodeVersion: "20"
