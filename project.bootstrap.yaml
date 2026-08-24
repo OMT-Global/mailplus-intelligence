@@ -22,6 +22,7 @@ repo:
     - .github/workflows/extended-validation.yml
     - .github/workflows/claude.yml
     - .github/workflows/release.yml
+    - .github/workflows/security.yml
     - scripts/check-detect-secrets.sh
     - scripts/ci/**
     - scripts/release/**
