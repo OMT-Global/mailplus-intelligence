@@ -28,7 +28,7 @@ Use this checklist after the first bootstrap render or whenever `project.bootstr
 
 ## Runner Policy
 
-- Shell-safe jobs must use `[self-hosted, linux, shell-only, public]`.
+- PR jobs remain GitHub-hosted. Trusted extended jobs use the SHA-restricted `linux-flow-trusted` group.
 - Native repos must use self-hosted runners for required automation; Docker, service-container, browser, and `container:` workloads require a dedicated self-hosted runner pool with matching capability labels.
 - Keep PR checks cheap. Add heavy validation to `scripts/ci/run-extended-validation.sh` instead of the PR lane.
 
