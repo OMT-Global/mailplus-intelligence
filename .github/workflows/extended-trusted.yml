@@ -1,0 +1,168 @@
+name: Trusted Extended Validation
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.12'
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  changes:
+    name: Detect Extended Validation Scope
+    if: github.repository == 'OMT-Global/mailplus-intelligence' && ((github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/pheidon/mailplus138-safe-recovery'))
+    timeout-minutes: 10
+    runs-on:
+      group: linux-flow-trusted
+      labels: [self-hosted, linux, shell-only, public]
+    outputs:
+      app: ${{ steps.preset.outputs.app || steps.filter.outputs.app || 'false' }}
+      ci: ${{ steps.preset.outputs.ci || steps.filter.outputs.ci || 'false' }}
+      extended: ${{ steps.preset.outputs.extended || steps.filter.outputs.extended || 'false' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'push'
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.ref == 'refs/heads/pheidon/mailplus138-safe-recovery' && '8e485e5c96c47d7a13e4d09cf98fe5a091ce6895' || github.sha }}
+
+      - name: Run full suite for nightly or manual invocations
+        id: preset
+        if: github.event_name != 'push'
+        run: |
+          cat >>"$GITHUB_OUTPUT" <<'EOF'
+          app=true
+          ci=true
+          extended=true
+          EOF
+
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: filter
+        if: github.event_name == 'push'
+        with:
+          filters: |
+            app:
+              - 'project.bootstrap.yaml'
+              - 'AGENTS.md'
+              - 'CLAUDE.md'
+              - '.devcontainer/**'
+              - '.githooks/**'
+              - '.github/workflows/**'
+              - 'pyproject.toml'
+              - 'src/**'
+              - 'tests/**'
+              - 'fixtures/**'
+              - 'scripts/**'
+              - 'docs/bootstrap/**'
+              - 'README.md'
+              - 'docs/**'
+            ci:
+              - 'project.bootstrap.yaml'
+              - 'AGENTS.md'
+              - 'CLAUDE.md'
+              - '.devcontainer/**'
+              - '.githooks/**'
+              - '.github/workflows/**'
+              - 'scripts/**'
+              - 'docs/bootstrap/**'
+              - '.env.example'
+              - 'CODEOWNERS'
+            extended:
+              - 'infra/**'
+              - 'ops/**'
+
+  fast-checks:
+    name: Fast Checks
+    runs-on:
+      group: linux-flow-trusted
+      labels: [self-hosted, linux, shell-only, public]
+    timeout-minutes: 15
+    needs: changes
+    if: (github.repository == 'OMT-Global/mailplus-intelligence' && ((github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/pheidon/mailplus138-safe-recovery'))) && (needs.changes.outputs.app == 'true' || needs.changes.outputs.ci == 'true')
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.ref == 'refs/heads/pheidon/mailplus138-safe-recovery' && '8e485e5c96c47d7a13e4d09cf98fe5a091ce6895' || github.sha }}
+
+      - name: Run fast checks
+        run: bash scripts/ci/run-fast-checks.sh
+
+  extended-checks:
+    name: Extended Checks
+    runs-on:
+      group: linux-flow-trusted
+      labels: [self-hosted, linux, shell-only, public]
+    timeout-minutes: 20
+    needs: changes
+    if: (github.repository == 'OMT-Global/mailplus-intelligence' && ((github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/pheidon/mailplus138-safe-recovery'))) && (needs.changes.outputs.extended == 'true' || needs.changes.outputs.app == 'true')
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.ref == 'refs/heads/pheidon/mailplus138-safe-recovery' && '8e485e5c96c47d7a13e4d09cf98fe5a091ce6895' || github.sha }}
+
+      - name: Run extended validation
+        run: bash scripts/ci/run-extended-validation.sh
+
+  validate-secrets:
+    name: Validate Secrets
+    if: github.repository == 'OMT-Global/mailplus-intelligence' && ((github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/pheidon/mailplus138-safe-recovery'))
+    runs-on:
+      group: linux-flow-trusted
+      labels: [self-hosted, linux, shell-only, public]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.ref == 'refs/heads/pheidon/mailplus138-safe-recovery' && '8e485e5c96c47d7a13e4d09cf98fe5a091ce6895' || github.sha }}
+      - name: Scan repository for secret patterns
+        run: bash scripts/check-detect-secrets.sh --all-files
+
+  extended-validation-gate:
+    name: Extended Validation Gate
+    runs-on:
+      group: linux-flow-trusted
+      labels: [self-hosted, linux, shell-only, public]
+    if: always() && (github.repository == 'OMT-Global/mailplus-intelligence' && ((github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/pheidon/mailplus138-safe-recovery')))
+    needs:
+      - changes
+      - fast-checks
+      - extended-checks
+      - validate-secrets
+    steps:
+      - name: Check extended validation jobs
+        env:
+          APP: ${{ needs.changes.outputs.app }}
+          CI: ${{ needs.changes.outputs.ci }}
+          EXTENDED: ${{ needs.changes.outputs.extended }}
+          RESULTS: >-
+            changes=${{ needs.changes.result }}
+            fast-checks=${{ needs.fast-checks.result }}
+            extended-checks=${{ needs.extended-checks.result }}
+            validate-secrets=${{ needs.validate-secrets.result }}
+        run: |
+          failed=0
+          for entry in $RESULTS; do
+            job="${entry%%=*}"
+            status="${entry##*=}"
+            expected=success
+            if [[ "$job" == fast-checks && "$APP" != true && "$CI" != true ]]; then expected=skipped; fi
+            if [[ "$job" == extended-checks && "$EXTENDED" != true && "$APP" != true ]]; then expected=skipped; fi
+            if [[ "$status" == "$expected" ]]; then
+              echo "OK   $job => $status"
+            else
+              echo "FAIL $job => $status"
+              failed=1
+            fi
+          done
+          exit "$failed"
