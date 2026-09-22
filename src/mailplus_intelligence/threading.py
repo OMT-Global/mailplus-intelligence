@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import hashlib
 from dataclasses import dataclass
 from typing import Any
 
@@ -125,6 +126,13 @@ def reconstruct_fixture_threads(messages: tuple[dict[str, Any], ...] | list[dict
             for message in messages
             if str(message["fixture_id"]) == fixture_ids[0]
         )
+        if not thread_hint:
+            root_message = next(
+                str(message["message_id"])
+                for message in messages
+                if str(message["fixture_id"]) == fixture_ids[0]
+            )
+            thread_hint = "thread-" + hashlib.sha256(root_message.encode("utf-8")).hexdigest()[:16]
         threads.append(
             ReconstructedThread(
                 thread_id=thread_hint or f"thread-{index}",

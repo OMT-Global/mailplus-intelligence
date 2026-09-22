@@ -70,6 +70,25 @@ Those distilled outputs can then feed:
 - future entity/concept pages
 - reminders/tasks when explicitly approved
 
+## What's in v0.1
+
+### Working end-to-end
+
+v0.1 is a fixture-mode release. It supports metadata fixture sync, SQLite
+schema bootstrap, deterministic thread reconstruction, lane classification,
+noise suppression, deterministic semantic extraction, LLM extraction when the
+optional `llm` extra and API key are configured, promotion queue review,
+dry-run exporters, scheduler locks, CLI inspection, and `mpi doctor`.
+
+### Stubbed / not-yet-wired
+
+- Live MailPlus/IMAP ingestion is not connected yet. The public adapter shape
+  is documented in [the live MailPlus adapter guide](docs/integration/live-mailplus-adapter.md)
+  as `contract-only` and tracked in [issue #106](https://github.com/OMT-Global/mailplus-intelligence/issues/106).
+- Production export to wiki, `memory/`, or reminders is dry-run only. The
+  future live export contract is documented in [the live export guide](docs/integration/live-export.md)
+  and deferred by the roadmap in [issue #98](https://github.com/OMT-Global/mailplus-intelligence/issues/98).
+
 ## What should not go into memory
 
 Avoid dumping:
@@ -95,6 +114,10 @@ This repo is targeting the **medium** architecture first:
 
 This gives high value without memory bloat or premature overbuilding.
 
+Start with the [fixture-mode quickstart](docs/quickstart.md) to seed a local
+database, search fixture metadata, review extraction candidates, and run a
+dry-run export without live MailPlus credentials.
+
 ## Runtime baseline
 
 M0 uses a Python 3.12 package with SQLite-friendly local foundations.
@@ -115,9 +138,9 @@ Run the fast unit-test baseline:
 bash scripts/ci/run-fast-checks.sh
 ```
 
-## Phase 1 goals
+## Read-only alpha goals
 
-Phase 1 should support practical operator questions like:
+The read-only alpha should support practical operator questions like:
 
 - What’s my history with this person?
 - Did I already commit to this?
@@ -125,7 +148,10 @@ Phase 1 should support practical operator questions like:
 
 ## Roadmap status
 
-The current roadmap is tracked in GitHub issues for this repository.
+The v0.1 public-release blockers are tracked with the
+[`release-v0.1` label](https://github.com/OMT-Global/mailplus-intelligence/issues?q=is%3Aissue+is%3Aopen+label%3Arelease-v0.1).
+Live integration and its dependency order are tracked in
+[issue #98](https://github.com/OMT-Global/mailplus-intelligence/issues/98).
 
 Primary epics include:
 
@@ -136,7 +162,10 @@ Primary epics include:
 - classification lanes
 - semantic extraction
 - memory/wiki promotion
-- phase-1 medium-architecture delivery
+- read-only single-account delivery
+
+Release history is tracked in [CHANGELOG.md](CHANGELOG.md), and versioning
+policy is documented in [docs/versioning.md](docs/versioning.md).
 
 ## Agent execution
 

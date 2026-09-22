@@ -21,6 +21,27 @@ Each event should include:
 
 Events must not include raw message bodies or attachment payloads.
 
+## Promotion Review Events
+
+Semantic review uses the append-only `review_events` table rather than the
+import event shape above. Each record contains:
+
+- stable `event_id` and `artifact_id`
+- monotonically increasing `artifact_revision`
+- `prior_status` and `new_status`
+- explicit `reviewer_identity`
+- timestamp, bounded notes, and an optional corrected summary
+
+The original artifact summary and provenance remain in `promotion_queue` and
+are protected by an immutable-envelope trigger. Corrections are new review
+event data; they never overwrite the extracted summary. Legacy terminal queue
+rows receive one deterministic `review.legacy_backfill` event attributed to
+`legacy-migration`.
+
+Review audit rows must not contain raw message bodies, prompt payloads, or
+attachment content. They may contain a reviewer correction because that is the
+reviewed derived artifact, not source mail text.
+
 ## Required Event Types
 
 The first importer should cover:

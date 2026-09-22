@@ -16,12 +16,30 @@ All semantic artifacts should include:
 - `summary`
 - `confidence`
 - `review_status`
+- `provenance`
 - `created_at`
 - `extractor_version`
+- `model_version`
+- `rule_version`
 
 `review_status` starts as `candidate` or `review_needed`. Promotion changes that
-status through the review workflow; extraction itself must not write durable
+status in queue state and append-only review events; the extraction-time value
+inside the artifact never changes. Extraction itself must not write durable
 memory or reminders.
+
+The canonical envelope is immutable after enqueue. `source_message_ids`,
+`source_locators`, and `evidence_refs` are separate fields and must round-trip
+without being packed into `provenance`. `provenance` is either `deterministic`
+or `llm`; deterministic artifacts require `rule_version`, LLM artifacts require
+`model_version`, and every artifact requires `extractor_version` and a
+timezone-aware `created_at`.
+
+String locators are opaque identifiers without whitespace. Structured locators
+use only the documented account, provider, mailbox/folder, export-ID, and UID
+fields; arbitrary extension keys, nested payloads, non-finite numbers, and
+credential-shaped values are rejected. Evidence references are single-line,
+privacy-safe references or short snippets of at most 256 characters. Unknown
+top-level fields are rejected rather than silently discarded.
 
 ## Artifact Types
 
@@ -89,3 +107,9 @@ material.
 Every artifact must point back to at least one MailPlus locator or fixture
 locator. Evidence references should be short snippets, line identifiers, or
 field references, not raw body dumps.
+
+Rows migrated from the pre-v4 queue use `provenance="legacy"`, preserve the old
+JSON `provenance` value as `evidence_refs` when it was a valid array, and use
+`extractor_version="legacy-unknown"`. Because the old schema discarded source
+message IDs and extractor/model/rule versions, those rows remain auditable but
+cannot be exported until re-extracted into a complete canonical envelope.

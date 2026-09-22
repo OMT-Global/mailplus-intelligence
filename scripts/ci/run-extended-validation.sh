@@ -8,4 +8,9 @@ else
   PYTHON_BIN=python3
 fi
 
-PYTHONPATH=src "$PYTHON_BIN" -m unittest tests.test_metadata_fixtures -v
+REPORT_PATH="${TMPDIR:-/tmp}/mailplus-intelligence-evaluation.json"
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src "$PYTHON_BIN" scripts/evaluate.py \
+  --fixtures-dir fixtures \
+  --report-json "$REPORT_PATH"
+
+echo "Evaluation report: $REPORT_PATH"

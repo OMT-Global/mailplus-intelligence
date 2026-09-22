@@ -1,9 +1,10 @@
-# Phase 2 Planning
+# Capability Status And Forward Plan
 
 ## Scope
 
-Phase 2 extends the metadata intelligence pipeline from the offline/fixture
-baseline (Phase 1) to a production-capable system.  The three pillars are:
+This document records capability evidence rather than treating a merged module
+as proof of live integration. The near-term target is the Phase B single-account,
+read-only alpha defined in issue #98. Its three pillars are:
 
 1. **LLM-backed extraction** — richer semantic artifacts from classified threads
 2. **Live account sync** — incremental, checkpointed sync from real MailPlus accounts
@@ -11,17 +12,29 @@ baseline (Phase 1) to a production-capable system.  The three pillars are:
 
 ---
 
-## Completed in Phase 2 (this branch)
+## Status Vocabulary
+
+| Status | Meaning |
+|---|---|
+| `fixture-complete` | The behavior works end-to-end against synthetic fixtures in CI. |
+| `contract-only` | Types and boundaries exist, but the external integration is a stub. |
+| `integrated` | A real external dependency works in a controlled non-production environment. |
+| `production-verified` | An approved operator has captured successful production evidence. |
+
+No live MailPlus capability is currently `integrated` or
+`production-verified`.
+
+## Current Capability Status
 
 | Module | Issue | Status |
 |---|---|---|
-| `sync.py` | #3 | done |
-| `extractor.py` | #6 | done |
-| `llm_extractor.py` | #70 | done |
-| `scheduler.py` | #74 | done |
-| `live_adapter.py` | #71 | done |
-| `cli.py` (search, queue, export, doctor) | #2, #4, #5, #7 | done |
-| `index_writer.py` + search | #39 | done |
+| `sync.py` | #100 | `fixture-complete` |
+| `extractor.py` | #6 | `fixture-complete` |
+| `llm_extractor.py` cassette path | #70 | `fixture-complete` |
+| `scheduler.py` SQLite lock path | #74 | `fixture-complete` |
+| `live_adapter.py` | #106 | `contract-only` |
+| `cli.py` fixture commands | #105 | `fixture-complete` |
+| `index_writer.py` + search | #39 | `fixture-complete` |
 
 ---
 
@@ -55,9 +68,10 @@ cleared automatically.
 
 ---
 
-## Phase 3 Candidates
+## Deferred Until The Read-Only Alpha Is Proven
 
-- **MailPlus API client**: replace `live_adapter._fetch_messages()` stub
+- **MailPlus/IMAP client**: issue #106 replaces the live adapter stub after its
+  Phase A dependencies close
 - **Streaming LLM extraction**: use `client.messages.stream()` for large threads
 - **Promotion workflow UI**: web interface for the queue review flow
 - **Multi-account support**: per-account checkpoints and lane configuration

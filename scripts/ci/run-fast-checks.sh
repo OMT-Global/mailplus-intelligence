@@ -16,4 +16,6 @@ PY
 
 bash scripts/check-detect-secrets.sh --all-files
 bash scripts/ci/check-ci-contract.sh
+"$PYTHON_BIN" scripts/ci/check-extended-trust.py
+PYTHONPATH=src "$PYTHON_BIN" scripts/ci/docs_smoke.py
 PYTHONPATH=src "$PYTHON_BIN" -m unittest discover -s tests -v

@@ -10,10 +10,8 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: read
 
 env:
-  NODE_VERSION: '20'
   PYTHON_VERSION: '3.12'
 
 defaults:
@@ -23,12 +21,14 @@ defaults:
 jobs:
   changes:
     name: Detect Relevant Changes
-    runs-on: ['self-hosted', 'synology', 'shell-only', 'private']
+    # Fork-controlled PR code never runs on persistent self-hosted runners.
+    runs-on: ubuntu-latest
     outputs:
       app: ${{ steps.filter.outputs.app }}
       ci: ${{ steps.filter.outputs.ci }}
+      packaging: ${{ steps.filter.outputs.packaging }}
     steps:
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
           filters: |
@@ -60,50 +60,113 @@ jobs:
               - 'docs/bootstrap/**'
               - '.env.example'
               - 'CODEOWNERS'
+            packaging:
+              - 'pyproject.toml'
+              - '.github/workflows/release.yml'
+              - 'scripts/release/**'
+
+  actionlint:
+    name: Actionlint
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: reviewdog/action-actionlint@ab7138020abfe6cd20b742c82e5b7a9749fb5884 # v1.75.0
+        with:
+          reporter: github-pr-check
+          fail_level: error
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: moderate
 
   fast-checks:
     name: Fast Checks
-    runs-on: ['self-hosted', 'synology', 'shell-only', 'private']
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: changes
     if: >-
       github.event.pull_request.draft == false &&
       (needs.changes.outputs.app == 'true' || needs.changes.outputs.ci == 'true')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
       - name: Run fast checks
         run: bash scripts/ci/run-fast-checks.sh
 
   validate-secrets:
     name: Validate Secrets
-    runs-on: ['self-hosted', 'synology', 'shell-only', 'private']
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     if: github.event.pull_request.draft == false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
       - name: Scan repository for secret patterns
         run: bash scripts/check-detect-secrets.sh --all-files
 
+  package-build:
+    name: Package Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: changes
+    if: >-
+      github.event.pull_request.draft == false &&
+      needs.changes.outputs.packaging == 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Build distribution artifacts
+        run: bash scripts/release/dry-run.sh --skip-fast-checks
+
   ci-gate:
     name: CI Gate
-    runs-on: ['self-hosted', 'synology', 'shell-only', 'private']
+    runs-on: ubuntu-latest
     if: always()
     needs:
       - changes
+      - actionlint
+      - dependency-review
       - fast-checks
       - validate-secrets
+      - package-build
     steps:
       - name: Check required PR jobs
         env:
           RESULTS: >-
             changes=${{ needs.changes.result }}
+            actionlint=${{ needs.actionlint.result }}
+            dependency-review=${{ needs.dependency-review.result }}
             fast-checks=${{ needs.fast-checks.result }}
             validate-secrets=${{ needs.validate-secrets.result }}
+            package-build=${{ needs.package-build.result }}
         run: |
           failed=0
           for entry in $RESULTS; do

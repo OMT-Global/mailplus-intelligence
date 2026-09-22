@@ -115,6 +115,24 @@ Forbidden in the repo:
 - Production selected text caches or semantic output exports that have not passed promotion review.
 - Machine-local caches, logs, database files, or generated stores that may contain raw message content.
 
+## Local Secret Scan Guardrail
+
+`scripts/check-detect-secrets.sh` is a fast baseline guardrail for CI and local preflight checks. It is not comprehensive DLP and does not replace operator review before live MailPlus integration, selected-text-cache work, or public release.
+
+The default CI mode scans tracked files only:
+
+```bash
+bash scripts/check-detect-secrets.sh --all-files
+```
+
+Before staging or opening a PR that may have generated local artifacts, use the broader local mode:
+
+```bash
+bash scripts/check-detect-secrets.sh --all-files-with-untracked
+```
+
+The broader mode includes untracked, non-ignored files and checks for common local leak shapes, including `.eml` and `.mbox` mailbox exports, MailPlus metadata/cache database filenames, and live OAuth, reset, magic-login, recovery, checkout, invoice, billing, or payment links with token-like query parameters. Synthetic documentation and fixtures should use reserved domains such as `example.com` and redaction markers such as `[REDACTED_TOKEN]` so the scanner can distinguish examples from live artifacts.
+
 ## Fixture Redaction Rules
 
 Fixtures must be synthetic by default. If a real-world shape is needed to reproduce parsing behavior, reduce it to the minimum structure and redact before committing.
@@ -157,6 +175,42 @@ Forbidden log fields:
 Operational rule:
 
 When a failure needs payload-level inspection, reproduce it with a synthetic fixture or inspect the raw source in MailPlus under operator control. Do not promote payload dumps into logs.
+
+## Model Provider And Egress Policy
+
+Model use is fail-closed. `MAILPLUS_LLM_PROVIDER_MODE` defaults to `disabled` and
+must be set explicitly to `local` or `cloud` for a non-cassette request. Cloud
+mode additionally requires `MAILPLUS_LLM_CLOUD_OPT_IN=true`; setting a model name
+or API key alone does not authorize egress. Cloud mode also requires
+`MAILPLUS_LLM_PSEUDONYMIZATION_KEY` from an approved secret store; that key is
+at least 32 UTF-8 bytes, is used only to derive non-reversible request
+pseudonyms, and is never persisted.
+
+Every request declares data classes allowed by the provider policy. The cloud
+default is only `metadata-redacted`. Sender, subject, folder, date, and thread identity
+are keyed-pseudonymized before a cloud request, and policy cannot disable that
+minimization. A task that genuinely needs a broader data class must receive a
+separate explicit policy change and privacy review; it must not reuse the
+metadata-only path implicitly.
+
+Non-cassette requests require a clean, file-backed audit connection; in-memory
+databases and connections with an active caller transaction fail closed. The
+authorized policy is bound to the selected client mode/provider before any
+request. Audit rows contain a request ID, keyed thread reference, provider
+mode/name, model, declared data classes, status, and timestamp. They do not contain prompts, responses, sender values,
+subjects, folders, selected text, credentials, or API keys. Cassette playback is
+local synthetic test behavior and performs no provider egress.
+
+Example cloud opt-in (credentials remain in the process environment or an
+approved secret store, never in a file committed to this repository):
+
+```bash
+export MAILPLUS_LLM_PROVIDER_MODE=cloud
+export MAILPLUS_LLM_PROVIDER=anthropic
+export MAILPLUS_LLM_DATA_CLASSES=metadata-redacted
+export MAILPLUS_LLM_CLOUD_OPT_IN=true
+export MAILPLUS_LLM_PSEUDONYMIZATION_KEY=[FROM_APPROVED_SECRET_STORE]
+```
 
 ## Promotion Review Checklist
 
