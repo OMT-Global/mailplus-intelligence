@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 EXPECTED = "2b1827b501d3c7ce24440b40167491fd9d27f94ce24d9b378cf5890a9f07d44f"
-PIN = "d08b5ee74df3eb6d016e9e4aa267acc4bcafd154"
+PIN = "86e71fa6191692a97bcc18088d384666ba0c6676"
 
 def validate(root):
     source = root / ".github/workflows/extended-trusted.yml"
