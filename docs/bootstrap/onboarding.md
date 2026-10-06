@@ -28,7 +28,7 @@ Use this checklist after the first bootstrap render or whenever `project.bootstr
 
 ## Runner Policy
 
-- PR jobs remain GitHub-hosted. Trusted extended jobs use the SHA-restricted `linux-flow-trusted` group.
+- PR jobs remain GitHub-hosted. Trusted extended jobs use the `synology-public` group with `[self-hosted, synology, shell-only, public]`, through the reviewed immutable reusable workflow. Public-repository access and repository eligibility must be enabled by an organization administrator.
 - Native repos must use self-hosted runners for required automation; Docker, service-container, browser, and `container:` workloads require a dedicated self-hosted runner pool with matching capability labels.
 - Keep PR checks cheap. Add heavy validation to `scripts/ci/run-extended-validation.sh` instead of the PR lane.
 

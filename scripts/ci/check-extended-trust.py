@@ -4,7 +4,7 @@ import hashlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-EXPECTED = "cd6c14dc501e30baf674828975365957bda676da64fcdefe94d6d33216d2092b"
+EXPECTED = "2b1827b501d3c7ce24440b40167491fd9d27f94ce24d9b378cf5890a9f07d44f"
 PIN = "d08b5ee74df3eb6d016e9e4aa267acc4bcafd154"
 
 def validate(root):

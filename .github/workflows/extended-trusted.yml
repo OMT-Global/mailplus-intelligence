@@ -20,8 +20,8 @@ jobs:
     if: github.repository == 'OMT-Global/mailplus-intelligence' && ((github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/pheidon/mailplus138-safe-recovery'))
     timeout-minutes: 10
     runs-on:
-      group: linux-flow-trusted
-      labels: [self-hosted, linux, shell-only, public]
+      group: synology-public
+      labels: [self-hosted, synology, shell-only, public]
     outputs:
       app: ${{ steps.preset.outputs.app || steps.filter.outputs.app || 'false' }}
       ci: ${{ steps.preset.outputs.ci || steps.filter.outputs.ci || 'false' }}
@@ -82,8 +82,8 @@ jobs:
   fast-checks:
     name: Fast Checks
     runs-on:
-      group: linux-flow-trusted
-      labels: [self-hosted, linux, shell-only, public]
+      group: synology-public
+      labels: [self-hosted, synology, shell-only, public]
     timeout-minutes: 15
     needs: changes
     if: (github.repository == 'OMT-Global/mailplus-intelligence' && ((github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/pheidon/mailplus138-safe-recovery'))) && (needs.changes.outputs.app == 'true' || needs.changes.outputs.ci == 'true')
@@ -99,8 +99,8 @@ jobs:
   extended-checks:
     name: Extended Checks
     runs-on:
-      group: linux-flow-trusted
-      labels: [self-hosted, linux, shell-only, public]
+      group: synology-public
+      labels: [self-hosted, synology, shell-only, public]
     timeout-minutes: 20
     needs: changes
     if: (github.repository == 'OMT-Global/mailplus-intelligence' && ((github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/pheidon/mailplus138-safe-recovery'))) && (needs.changes.outputs.extended == 'true' || needs.changes.outputs.app == 'true')
@@ -117,8 +117,8 @@ jobs:
     name: Validate Secrets
     if: github.repository == 'OMT-Global/mailplus-intelligence' && ((github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/pheidon/mailplus138-safe-recovery'))
     runs-on:
-      group: linux-flow-trusted
-      labels: [self-hosted, linux, shell-only, public]
+      group: synology-public
+      labels: [self-hosted, synology, shell-only, public]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -131,8 +131,8 @@ jobs:
   extended-validation-gate:
     name: Extended Validation Gate
     runs-on:
-      group: linux-flow-trusted
-      labels: [self-hosted, linux, shell-only, public]
+      group: synology-public
+      labels: [self-hosted, synology, shell-only, public]
     if: always() && (github.repository == 'OMT-Global/mailplus-intelligence' && ((github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/pheidon/mailplus138-safe-recovery')))
     needs:
       - changes
