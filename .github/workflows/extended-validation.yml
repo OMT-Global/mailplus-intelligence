@@ -16,4 +16,4 @@ permissions:
 
 jobs:
   trusted:
-    uses: OMT-Global/mailplus-intelligence/.github/workflows/extended-trusted.yml@86e71fa6191692a97bcc18088d384666ba0c6676 # v1
+    uses: OMT-Global/mailplus-intelligence/.github/workflows/extended-trusted.yml@43df5b1f34bcd08d78a5dce4684c8b0a83aee212 # v1
