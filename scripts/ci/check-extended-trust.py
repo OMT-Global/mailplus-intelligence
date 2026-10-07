@@ -4,8 +4,8 @@ import hashlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-EXPECTED = "cd6c14dc501e30baf674828975365957bda676da64fcdefe94d6d33216d2092b"
-PIN = "d08b5ee74df3eb6d016e9e4aa267acc4bcafd154"
+EXPECTED = "b2de1048d97b65b8257a179173544af9b2758d202f6b02bfa473fe1a17dba11a"
+PIN = "43df5b1f34bcd08d78a5dce4684c8b0a83aee212"
 
 def validate(root):
     source = root / ".github/workflows/extended-trusted.yml"

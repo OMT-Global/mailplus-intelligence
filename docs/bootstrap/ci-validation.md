@@ -21,9 +21,9 @@ The fast lane currently checks:
 - Unit tests with `PYTHONPATH=src python -m unittest discover -s tests -v`.
 - Actionlint and GitHub dependency review on each ready-for-review PR.
 
-External actions are pinned to immutable commit SHAs. Trusted post-merge and
-release jobs may use the documented private self-hosted runner labels; PR jobs
-must remain GitHub-hosted and check out without persisted credentials.
+External actions are pinned to immutable commit SHAs. PR and trusted extended
+fixture jobs use GitHub-hosted Ubuntu and check out without persisted credentials.
+Extended validation has no live-network or specialized hardware requirement.
 
 ## Extended validation
 

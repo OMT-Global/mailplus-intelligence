@@ -27,7 +27,7 @@ class ExtendedTrustTests(unittest.TestCase):
         mutations = [
             ("github.event_name == 'schedule'", "github.event_name == 'pull_request'"),
             ("github.repository == 'OMT-Global/mailplus-intelligence'", "true"),
-            ("group: linux-flow-trusted", "group: linux-public"),
+            ("runs-on: ubuntu-latest", "runs-on: [self-hosted, synology, shell-only, private]"),
             ("persist-credentials: false", "persist-credentials: true"),
             ("bash scripts/ci/run-extended-validation.sh", "echo skipped"),
             ("workflow_call:", "workflow_call:\n    inputs: {}"),
