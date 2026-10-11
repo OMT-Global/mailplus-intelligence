@@ -8,12 +8,16 @@ from unittest import mock
 
 from mailplus_intelligence.live_adapter import (
     LiveAuthenticationError,
+    LiveBackendUnavailable,
     LiveCursorInvalidated,
     LiveAdapterNotConfigured,
     LiveAdapterConfig,
     fetch_batch,
     load_live_config,
 )
+from mailplus_intelligence.schema import apply_all_migrations
+from mailplus_intelligence.sqlite import connect_sqlite
+from mailplus_intelligence.sync import get_checkpoint, run_sync_batch
 
 
 class LiveAdapterConfigTests(unittest.TestCase):
@@ -167,6 +171,119 @@ class LiveAdapterIMAPTests(unittest.TestCase):
     def test_authentication_failure_is_typed(self) -> None:
         with self.assertRaises(LiveAuthenticationError):
             fetch_batch(self._make_config(), client_factory=lambda *_: FakeIMAP(login_status="NO"))
+
+
+class RangeSearchIMAP(FakeIMAP):
+    """Model RFC 3501 UID ranges, including reversed ranges at mailbox EOF."""
+
+    def __init__(self, uids, *, fail_uid=None, **kwargs):
+        super().__init__(**kwargs)
+        self.uids = uids
+        self.fail_uid = fail_uid
+        self.logged_out = False
+
+    def uid(self, command, *args):
+        if command == "search":
+            if not self.uids:
+                return "OK", [b""]
+            start = int(args[1].removeprefix("UID ").split(":")[0])
+            lower, upper = sorted((start, max(self.uids)))
+            matches = [uid for uid in self.uids if lower <= uid <= upper]
+            return "OK", [" ".join(map(str, matches)).encode()]
+        if int(args[0]) == self.fail_uid:
+            raise OSError("synthetic connection loss")
+        return super().uid(command, *args)
+
+    def logout(self):
+        self.logged_out = True
+        return super().logout()
+
+
+class LiveAdapterRecoveryTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.config = LiveAdapterConfig(
+            host="imap.example.test", user="user@example.test", token="synthetic"
+        )
+        self.conn = connect_sqlite(":memory:")
+        apply_all_migrations(self.conn)
+        self.addCleanup(self.conn.close)
+
+    def sync(self, fake, cursor="", *, config=None):
+        batch = fetch_batch(config or self.config, cursor, client_factory=lambda *_: fake)
+        result = run_sync_batch(self.conn, batch)
+        self.assertTrue(result.success, result.write_errors)
+        return batch, result
+
+    def test_caught_up_poll_does_not_reingest_last_message(self) -> None:
+        initial, _ = self.sync(RangeSearchIMAP([10, 11]))
+        fake = RangeSearchIMAP([10, 11])
+
+        batch, result = self.sync(fake, initial.cursor)
+
+        self.assertEqual(batch.messages, ())
+        self.assertEqual(batch.cursor, initial.cursor)
+        self.assertEqual(result.accounted, 0)
+        self.assertEqual(fake.fetch_arguments, [])
+        self.assertTrue(fake.logged_out)
+
+    def test_expunged_tail_does_not_move_checkpoint_backwards(self) -> None:
+        initial, _ = self.sync(RangeSearchIMAP([10, 11]))
+        fake = RangeSearchIMAP([10])
+
+        batch, _ = self.sync(fake, initial.cursor)
+
+        self.assertEqual(batch.cursor, initial.cursor)
+        self.assertEqual(batch.messages, ())
+        self.assertEqual(get_checkpoint(self.conn, batch.source_name)["cursor"], initial.cursor)
+        self.assertEqual(fake.fetch_arguments, [])
+
+    def test_numeric_pagination_does_not_skip_uids_in_search_response(self) -> None:
+        config = LiveAdapterConfig(
+            host=self.config.host, user=self.config.user, token=self.config.token, page_size=2
+        )
+        cursor = ""
+        ingested = []
+        for _ in range(3):
+            batch, _ = self.sync(RangeSearchIMAP([10, 100, 9]), cursor, config=config)
+            ingested.extend(message["locator"]["uid"] for message in batch.messages)
+            cursor = batch.cursor
+
+        self.assertEqual(ingested, ["9", "10", "100"])
+        self.assertEqual(cursor, "uidvalidity:42;uid:100")
+
+    def test_empty_mailbox_preserves_checkpoint(self) -> None:
+        initial, _ = self.sync(RangeSearchIMAP([10]))
+        batch, result = self.sync(RangeSearchIMAP([]), initial.cursor)
+        self.assertEqual(batch.cursor, initial.cursor)
+        self.assertEqual(result.accounted, 0)
+
+    def test_partial_fetch_disconnect_keeps_checkpoint_and_retry_recovers(self) -> None:
+        initial, _ = self.sync(RangeSearchIMAP([9]))
+        fake = RangeSearchIMAP([9, 10, 11], fail_uid=11)
+        with self.assertRaises(LiveBackendUnavailable):
+            self.sync(fake, initial.cursor)
+        self.assertEqual(len(fake.fetch_arguments), 1)
+        self.assertTrue(fake.logged_out)
+        self.assertEqual(get_checkpoint(self.conn, initial.source_name)["cursor"], initial.cursor)
+        self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0], 1)
+
+        batch, result = self.sync(RangeSearchIMAP([9, 10, 11]), initial.cursor)
+        self.assertEqual(result.inserted, 2)
+        self.assertEqual(batch.cursor, "uidvalidity:42;uid:11")
+        self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0], 3)
+        _, replayed = self.sync(RangeSearchIMAP([9, 10, 11]), initial.cursor)
+        self.assertEqual(replayed.inserted, 0)
+        self.assertEqual(replayed.unchanged, 2)
+
+    def test_uidvalidity_change_preserves_committed_data_and_checkpoint(self) -> None:
+        initial, _ = self.sync(RangeSearchIMAP([10]))
+        fake = RangeSearchIMAP([10], uidvalidity=b"43")
+        with self.assertRaises(LiveCursorInvalidated):
+            self.sync(fake, initial.cursor)
+        self.assertTrue(fake.logged_out)
+        self.assertEqual(fake.fetch_arguments, [])
+        self.assertEqual(get_checkpoint(self.conn, initial.source_name)["cursor"], initial.cursor)
+        self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0], 1)
 
 
 if __name__ == "__main__":
