@@ -158,7 +158,12 @@ def fetch_batch(config: LiveAdapterConfig, cursor: str = "", *, client_factory: 
         status, matches = client.uid("search", None, f"UID {last_uid + 1}:*")
         if status != "OK":
             raise LiveBackendUnavailable("IMAP UID search failed")
-        uids = str(matches[0].decode() if matches else "").split()[: config.page_size]
+        # IMAP ranges include both endpoints regardless of order: at EOF,
+        # UID n:* can still return the last UID even when it is below n.
+        # Filter and order the complete result before limiting the page so
+        # the checkpoint cannot regress or skip an unprocessed lower UID.
+        matched_uids = {int(uid) for uid in (matches[0].split() if matches else [])}
+        uids = [str(uid) for uid in sorted(matched_uids) if uid > last_uid][: config.page_size]
         records: list[dict[str, Any]] = []
         for uid in uids:
             status, payload = client.uid("fetch", uid, "(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID SUBJECT FROM TO CC DATE REFERENCES IN-REPLY-TO)] FLAGS)")
