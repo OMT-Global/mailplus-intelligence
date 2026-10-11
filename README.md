@@ -80,11 +80,18 @@ noise suppression, deterministic semantic extraction, LLM extraction when the
 optional `llm` extra and API key are configured, promotion queue review,
 dry-run exporters, scheduler locks, CLI inspection, and `mpi doctor`.
 
-### Stubbed / not-yet-wired
+### Read-only IMAPS ingestion
 
-- Live MailPlus/IMAP ingestion is not connected yet. The public adapter shape
-  is documented in [the live MailPlus adapter guide](docs/integration/live-mailplus-adapter.md)
-  as `contract-only` and tracked in [issue #106](https://github.com/OMT-Global/mailplus-intelligence/issues/106).
+`mpi sync run` implements credential-gated ingestion of one bounded page of
+headers and flags from a mailbox selected read-only. Resume requires an explicit
+`--cursor`; the command does not automatically load the saved checkpoint.
+Existing fake-server tests cover the adapter boundary, including UIDVALIDITY
+invalidation and authentication failure. Real MailPlus integration and
+production operation remain unverified. See [the live MailPlus adapter guide](docs/integration/live-mailplus-adapter.md)
+for configuration and the implemented contract from [issue #106](https://github.com/OMT-Global/mailplus-intelligence/issues/106).
+
+### Deferred integrations
+
 - Production export to wiki, `memory/`, or reminders is dry-run only. The
   future live export contract is documented in [the live export guide](docs/integration/live-export.md)
   and deferred by the roadmap in [issue #98](https://github.com/OMT-Global/mailplus-intelligence/issues/98).

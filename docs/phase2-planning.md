@@ -32,9 +32,16 @@ No live MailPlus capability is currently `integrated` or
 | `extractor.py` | #6 | `fixture-complete` |
 | `llm_extractor.py` cassette path | #70 | `fixture-complete` |
 | `scheduler.py` SQLite lock path | #74 | `fixture-complete` |
-| `live_adapter.py` | #106 | `contract-only` |
+| `live_adapter.py` | #106 | Implemented; fake-server-tested (see below) |
 | `cli.py` fixture commands | #105 | `fixture-complete` |
 | `index_writer.py` + search | #39 | `fixture-complete` |
+
+The IMAPS adapter and `mpi sync run` are implemented. Existing tests use an
+injected fake IMAP client to verify read-only header fetching, flags,
+UIDVALIDITY cursors, invalidation, and authentication failure. Each CLI
+invocation fetches one bounded page, and resume requires an explicit `--cursor`.
+This evidence does not establish `integrated` or `production-verified` status;
+see the [adapter contract](integration/live-mailplus-adapter.md).
 
 ---
 
@@ -70,8 +77,8 @@ cleared automatically.
 
 ## Deferred Until The Read-Only Alpha Is Proven
 
-- **MailPlus/IMAP client**: issue #106 replaces the live adapter stub after its
-  Phase A dependencies close
+- **Live MailPlus verification**: the implemented IMAPS adapter still needs
+  controlled real-environment evidence before claiming integrated status
 - **Streaming LLM extraction**: use `client.messages.stream()` for large threads
 - **Promotion workflow UI**: web interface for the queue review flow
 - **Multi-account support**: per-account checkpoints and lane configuration

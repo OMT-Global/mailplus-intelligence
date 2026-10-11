@@ -3,9 +3,13 @@
 The first supported transport is credential-gated IMAPS. `mpi sync run` opens
 the configured mailbox read-only, records UIDVALIDITY plus the last processed
 UID, and requests headers and flags only. It never requests RFC822 bodies, MIME
-parts, or attachment payloads during metadata sync. Fixture mode exercises the
-same boundary through an injected fake IMAP server; real connections remain an
-explicit operator action and are not part of CI.
+parts, or attachment payloads during metadata sync. Automated adapter tests
+exercise the same boundary through an injected fake IMAP client; real connections
+remain an explicit operator action and are not part of CI.
+
+Each invocation fetches one bounded page. To resume, pass the saved cursor with
+`--cursor`; the CLI does not automatically load it from the database. Fake-server
+coverage does not establish real MailPlus integration or production verification.
 
 ## Expected Configuration
 
@@ -13,9 +17,9 @@ explicit operator action and are not part of CI.
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `MAILPLUS_HOST` | yes | MailPlus API or IMAP host |
+| `MAILPLUS_HOST` | yes | IMAPS host |
 | `MAILPLUS_USER` | yes | Mailbox identity |
-| `MAILPLUS_TOKEN` | yes | OAuth token or app password |
+| `MAILPLUS_TOKEN` | yes | Password or app password accepted by IMAP LOGIN |
 | `MAILPLUS_MAILBOX` | no | Mailbox/folder root, default `INBOX` |
 | `MAILPLUS_PAGE_SIZE` | no | Batch size, default `50` |
 | `MAILPLUS_PORT` | no | TLS port, default `993` |
@@ -31,7 +35,7 @@ but operators must export or process-inject values explicitly.
 
 Live ingestion must return the same `SyncBatch` shape as fixture ingestion:
 
-- `source_name`: stable source identifier such as `live:<user>`
+- `source_name`: stable source identifier `imap:<mailbox>`
 - `cursor`: checkpoint to commit after this batch succeeds
 - `messages`: tuple of metadata-only message dictionaries
 
@@ -39,10 +43,11 @@ The adapter function may accept the prior checkpoint as an input parameter, but
 `SyncBatch` has no `next_cursor` field. Its `cursor` value is the next checkpoint
 that `run_sync_batch()` records only after the batch succeeds.
 
-Each message should include source account/mailbox/folder, stable UID, message
-ID, references/in-reply-to headers when present, sender/recipients, subject,
-sent date, labels/flags, locator fields, and attachment metadata. It must not
-include raw message bodies.
+Each returned message includes message ID, references/in-reply-to headers when
+present, sender/recipients, subject, sent date, flags, and source
+account/mailbox/folder/UID locator fields. The current IMAPS adapter emits empty
+labels and attachment metadata lists; it does not discover attachments. Raw
+message bodies are excluded.
 
 ## Read-only IMAP Boundary
 
