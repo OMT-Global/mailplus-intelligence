@@ -158,7 +158,7 @@ def fetch_batch(config: LiveAdapterConfig, cursor: str = "", *, client_factory: 
         status, matches = client.uid("search", None, f"UID {last_uid + 1}:*")
         if status != "OK":
             raise LiveBackendUnavailable("IMAP UID search failed")
-        uids = str(matches[0].decode() if matches else "").split()[: config.page_size]
+        uids = str(matches[0].decode() if matches and matches[0] else "").split()[: config.page_size]
         records: list[dict[str, Any]] = []
         for uid in uids:
             status, payload = client.uid("fetch", uid, "(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID SUBJECT FROM TO CC DATE REFERENCES IN-REPLY-TO)] FLAGS)")
