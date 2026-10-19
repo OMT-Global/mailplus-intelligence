@@ -162,7 +162,7 @@ def fetch_batch(config: LiveAdapterConfig, cursor: str = "", *, client_factory: 
         # UID n:* can still return the last UID even when it is below n.
         # Filter and order the complete result before limiting the page so
         # the checkpoint cannot regress or skip an unprocessed lower UID.
-        matched_uids = {int(uid) for uid in (matches[0].split() if matches else [])}
+        matched_uids = {int(uid) for uid in (matches[0].split() if matches and matches[0] else [])}
         uids = [str(uid) for uid in sorted(matched_uids) if uid > last_uid][: config.page_size]
         records: list[dict[str, Any]] = []
         for uid in uids:

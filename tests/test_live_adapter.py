@@ -164,6 +164,20 @@ class LiveAdapterIMAPTests(unittest.TestCase):
         self.assertTrue(all("BODY.PEEK[HEADER.FIELDS" in call[2] for call in fake.fetch_arguments))
         self.assertFalse(any("RFC822" in call[2] for call in fake.fetch_arguments))
 
+    def test_empty_search_preserves_checkpoint_and_logs_out(self) -> None:
+        for response in ([None], [b""], []):
+            for cursor, expected_uid in (("", 0), ("uidvalidity:42;uid:11", 11)):
+                with self.subTest(response=response, cursor=cursor):
+                    fake = FakeIMAP()
+                    with mock.patch.object(fake, "uid", return_value=("OK", response)) as uid_call:
+                        with mock.patch.object(fake, "logout", wraps=fake.logout) as logout:
+                            batch = fetch_batch(self._make_config(), cursor, client_factory=lambda *_: fake)
+                    self.assertEqual(batch.messages, ())
+                    self.assertEqual(batch.cursor, f"uidvalidity:42;uid:{expected_uid}")
+                    self.assertEqual(uid_call.call_count, 1)
+                    self.assertEqual(uid_call.call_args.args[0], "search")
+                    logout.assert_called_once_with()
+
     def test_uidvalidity_change_fails_closed(self) -> None:
         with self.assertRaises(LiveCursorInvalidated):
             fetch_batch(self._make_config(), "uidvalidity:old;uid:10", client_factory=lambda *_: FakeIMAP())
