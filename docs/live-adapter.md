@@ -1,9 +1,9 @@
 # Live Adapter
 
-`live_adapter.py` defines the boundary between the fixture-backed sync pipeline
-and a future real MailPlus account. It produces the same `SyncBatch` type used
-by `run_sync_batch()`, but the network transport and live CLI path are not yet
-implemented.
+`live_adapter.py` implements credential-gated, read-only IMAPS metadata
+fetching. `mpi sync run` calls `fetch_batch()` and passes its `SyncBatch` to
+`run_sync_batch()`. Each invocation fetches one bounded page of headers and
+flags; it does not fetch message bodies or attachment payloads.
 
 ## Configuration
 
@@ -11,15 +11,16 @@ Provide these values in the invoking process environment:
 
 | Variable | Required | Description |
 |---|---|---|
-| `MAILPLUS_HOST` | yes | IMAP or MailPlus API hostname |
+| `MAILPLUS_HOST` | yes | IMAPS hostname |
 | `MAILPLUS_USER` | yes | Mailbox address |
-| `MAILPLUS_TOKEN` | yes | OAuth2 bearer token or app password |
+| `MAILPLUS_TOKEN` | yes | Password or app password accepted by IMAP LOGIN |
 | `MAILPLUS_MAILBOX` | no | Folder to sync (default `INBOX`) |
-| `MAILPLUS_PAGE_SIZE` | no | Messages per batch (default `50`) |
+| `MAILPLUS_PAGE_SIZE` | no | Messages per batch, 1–1000 (default `50`) |
+| `MAILPLUS_PORT` | no | TLS port, 1–65535 (default `993`) |
 
 If any required variable is absent, `load_live_config()` raises
-`LiveAdapterNotConfigured`.  CI omits these variables deliberately, so the live
-path is never exercised in automated tests.
+`LiveAdapterNotConfigured`. Automated tests inject synthetic configuration and
+a fake IMAP client; they do not connect to a real mailbox.
 
 The application does not load dotenv files. `.env.example` is a naming template,
 not an automatically loaded configuration source. Export values in the shell or
@@ -41,11 +42,19 @@ batch = fetch_batch(config, cursor="")
 
 ## Current Status
 
-Status: `contract-only`. `_fetch_messages()` is a stub that returns an empty
-list. `mpi doctor` therefore reports configuration separately from reachability,
-authentication, and sync capability; only configuration can currently be `ok`.
-The boundary may evolve when issue #106 adds and fake-server-tests a real
-read-only transport.
+Status: implemented with fake-server coverage; real MailPlus integration and
+production operation remain unverified. Existing tests verify read-only mailbox
+selection, header-only requests, flags, UIDVALIDITY cursor construction,
+invalidation, and authentication failure.
+
+Resume requires passing the prior cursor to `fetch_batch()` or supplying
+`mpi sync run --cursor`; the CLI does not automatically read the saved
+checkpoint. The cursor records UIDVALIDITY and the last processed UID. See the
+[adapter contract](integration/live-mailplus-adapter.md) for details.
+
+`mpi doctor` checks local configuration without network access. Reachability,
+authentication, and sync capability remain `gated` in doctor because it never
+probes those capabilities. Operators must run an explicit sync to verify them.
 
 ## Security
 
