@@ -16,19 +16,29 @@ from scripts.release.validate_artifacts import REQUIRED_MIGRATIONS
 VALIDATOR = Path(__file__).resolve().parents[1] / "scripts" / "release" / "validate_artifacts.py"
 
 
-def _write_wheel(path: Path, migrations: tuple[str, ...]) -> None:
+def _write_wheel(
+    path: Path,
+    migrations: tuple[str, ...],
+    *,
+    contents: dict[str, bytes] | None = None,
+) -> None:
     with zipfile.ZipFile(path, mode="w") as archive:
         for migration in migrations:
             archive.writestr(
                 f"mailplus_intelligence/migrations/{migration}",
-                "PRAGMA user_version = 1;\n",
+                (contents or {}).get(migration, b"PRAGMA user_version = 1;\n"),
             )
 
 
-def _write_sdist(path: Path, migrations: tuple[str, ...]) -> None:
+def _write_sdist(
+    path: Path,
+    migrations: tuple[str, ...],
+    *,
+    contents: dict[str, bytes] | None = None,
+) -> None:
     with tarfile.open(path, mode="w:gz") as archive:
         for migration in migrations:
-            content = b"PRAGMA user_version = 1;\n"
+            content = (contents or {}).get(migration, b"PRAGMA user_version = 1;\n")
             member = tarfile.TarInfo(
                 f"mailplus_intelligence-0.1.1/src/mailplus_intelligence/migrations/{migration}"
             )
@@ -70,6 +80,25 @@ class ReleaseArtifactValidationTests(unittest.TestCase):
                     self.assertNotEqual(completed.returncode, 0)
                     self.assertIn("missing required migration resources", completed.stderr)
                     self.assertIn(REQUIRED_MIGRATIONS[-1], completed.stderr)
+
+    def test_rejects_wheel_or_sdist_with_empty_migration(self) -> None:
+        migration = REQUIRED_MIGRATIONS[-1]
+        with tempfile.TemporaryDirectory() as temporary:
+            for suffix, writer in (("whl", _write_wheel), ("tar.gz", _write_sdist)):
+                for content in (b"", b" \t\r\n\v\f"):
+                    with self.subTest(suffix=suffix, content=content):
+                        artifact = Path(temporary) / f"mailplus_intelligence-0.1.1.{suffix}"
+                        writer(artifact, REQUIRED_MIGRATIONS, contents={migration: content})
+
+                        completed = self._run_validator(artifact)
+
+                        self.assertEqual(completed.returncode, 1, completed.stderr)
+                        self.assertEqual(
+                            completed.stderr,
+                            f"artifact validation failed: {artifact.name} contains empty "
+                            f"migration resources: migrations/{migration}\n",
+                        )
+                        self.assertEqual(completed.stdout, "")
 
 
 if __name__ == "__main__":
