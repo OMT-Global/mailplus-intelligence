@@ -56,7 +56,7 @@ jobs:
         uses: anthropics/claude-code-action@a26b07d8c778b0c43f64618e5fd29fd0f8af72e8 # v1.0.250
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          track_progress: true
+          track_progress: ${{ github.event_name != 'workflow_dispatch' }}
           use_sticky_comment: true
           additional_permissions: "actions: read"
           prompt: |

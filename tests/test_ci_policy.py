@@ -34,6 +34,15 @@ class WorkflowPolicyTests(unittest.TestCase):
         self.assertIn("name: Dependency Review", executable)
         self.assertIn("name: CI Gate", executable)
 
+    def test_claude_manual_dispatch_disables_tracking(self) -> None:
+        workflow = without_comments((WORKFLOWS / "claude.yml").read_text(encoding="utf-8"))
+        # The action rejects track_progress for workflow_dispatch; comment and
+        # review event paths must retain their existing tracking behavior.
+        self.assertIn("workflow_dispatch:", workflow)
+        tracking = re.findall(r"^\s*track_progress:\s*(.+)$", workflow, re.MULTILINE)
+        self.assertEqual(tracking, ["${{ github.event_name != 'workflow_dispatch' }}"])
+        self.assertIn("github.event.inputs.prompt", workflow)
+
     def test_claude_automation_is_hosted_and_actor_gated(self) -> None:
         workflow = without_comments((WORKFLOWS / "claude.yml").read_text(encoding="utf-8"))
         self.assertIn("runs-on: ubuntu-latest", workflow)
